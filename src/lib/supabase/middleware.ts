@@ -43,16 +43,38 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ── Route protection (intentionally NOT enforced in Phase 1) ──
-  // No protected routes exist yet. When the (protected) route group gains
-  // pages, add a redirect here, e.g.:
-  //
-  //   if (!user && request.nextUrl.pathname.startsWith("/app")) {
-  //     const url = request.nextUrl.clone();
-  //     url.pathname = "/login";
-  //     return NextResponse.redirect(url);
-  //   }
-  void user;
+  const { pathname } = request.nextUrl;
+  const isPublic =
+    pathname === "/" || pathname === "/login" || pathname.startsWith("/auth");
+
+  // Unauthenticated user on a protected route → login.
+  if (!user && !isPublic) {
+    return redirectPreservingSession(request, supabaseResponse, "/login");
+  }
+
+  // Authenticated user on the login page → dashboard.
+  if (user && pathname === "/login") {
+    return redirectPreservingSession(request, supabaseResponse, "/dashboard");
+  }
 
   return supabaseResponse;
+}
+
+/**
+ * Redirects while carrying over any auth cookies that getUser() refreshed onto
+ * `supabaseResponse`, so the session isn't dropped during the redirect.
+ */
+function redirectPreservingSession(
+  request: NextRequest,
+  supabaseResponse: NextResponse,
+  pathname: string,
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+  const redirectResponse = NextResponse.redirect(url);
+  supabaseResponse.cookies
+    .getAll()
+    .forEach((cookie) => redirectResponse.cookies.set(cookie));
+  return redirectResponse;
 }

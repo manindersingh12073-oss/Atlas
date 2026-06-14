@@ -1,3 +1,0 @@
-# Route group: AUTHENTICATED app pages (dashboard, people, events, tags...).
-# A layout here will guard these routes (redirect anonymous users to login)
-# once features are built. No URL segment is added by the (protected) name.

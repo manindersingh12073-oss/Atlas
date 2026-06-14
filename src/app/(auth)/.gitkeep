@@ -1,3 +1,0 @@
-# Route group: PUBLIC auth pages (login, etc.).
-# Parentheses mean this folder does NOT add a URL segment — it only groups
-# routes so they can share a layout. Pages are added in a later phase.
