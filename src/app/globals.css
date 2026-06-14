@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind CSS v4 — theme & design tokens are configured here in CSS via
+ * the `@theme` directive (not a tailwind.config.js). Phase 1 ships defaults;
+ * Atlas brand tokens (colors, fonts, radii) will be added here as the UI is built.
+ *
+ * @theme {
+ *   --color-brand: #...;
+ * }
+ */
