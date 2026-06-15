@@ -114,26 +114,38 @@ export default async function EventDetailPage({ params }: Props) {
 
       {/* ── People section ─────────────────────────────────────────── */}
       <section className="mt-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <h2 className="text-base font-semibold">
             People met here{" "}
             <span className="text-sm font-normal text-gray-500">
               ({peopleCount})
             </span>
           </h2>
-          <Link
-            href={`/events/${event.id}/link-person`}
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
-          >
-            + Link person
-          </Link>
+          <div className="flex shrink-0 gap-2">
+            <Link
+              href={`/events/${event.id}/link-person`}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+            >
+              Link existing person
+            </Link>
+            <Link
+              href={`/events/${event.id}/add-person`}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+            >
+              Create new person
+            </Link>
+          </div>
         </div>
 
         {linkedPeople.length === 0 ? (
           <p className="mt-3 text-sm text-gray-500">
             No people linked yet.{" "}
             <Link href={`/events/${event.id}/link-person`} className="underline">
-              Link someone you met.
+              Link existing person
+            </Link>
+            {" or "}
+            <Link href={`/events/${event.id}/add-person`} className="underline">
+              create new person.
             </Link>
           </p>
         ) : (

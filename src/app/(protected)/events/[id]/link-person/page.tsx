@@ -11,19 +11,9 @@ export default async function LinkPersonPage({ params }: Props) {
   const supabase = await createClient();
 
   const [eventResult, allPeopleResult, linkedResult] = await Promise.all([
-    supabase
-      .from("events")
-      .select("id, name")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("people")
-      .select("id, name, company, role")
-      .order("name"),
-    supabase
-      .from("event_people")
-      .select("person_id")
-      .eq("event_id", id),
+    supabase.from("events").select("id, name").eq("id", id).single(),
+    supabase.from("people").select("id, name, company, role").order("name"),
+    supabase.from("event_people").select("person_id").eq("event_id", id),
   ]);
 
   if (!eventResult.data) notFound();
@@ -43,18 +33,30 @@ export default async function LinkPersonPage({ params }: Props) {
           ← {event.name}
         </Link>
       </div>
-      <h1 className="mb-6 text-xl font-semibold">Link person to event</h1>
+
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold">Link existing person</h1>
+        <Link
+          href={`/events/${event.id}/add-person`}
+          className="shrink-0 text-sm text-gray-500 hover:underline"
+        >
+          Create new person →
+        </Link>
+      </div>
 
       {allPeople.length === 0 ? (
         <p className="text-sm text-gray-500">
           You have no people yet.{" "}
-          <Link href="/people/new" className="underline">
-            Add a person first.
+          <Link href={`/events/${event.id}/add-person`} className="underline">
+            Create a new person.
           </Link>
         </p>
       ) : availablePeople.length === 0 ? (
         <p className="text-sm text-gray-500">
-          All your people are already linked to this event.
+          All your people are already linked to this event.{" "}
+          <Link href={`/events/${event.id}/add-person`} className="underline">
+            Create a new person instead.
+          </Link>
         </p>
       ) : (
         <LinkPersonForm availablePeople={availablePeople} eventId={event.id} />

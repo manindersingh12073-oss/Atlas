@@ -2,8 +2,13 @@ import Link from "next/link";
 
 import { PersonForm } from "@/components/people/PersonForm";
 import { createPerson } from "@/lib/people/actions";
+import { getCompanySuggestions } from "@/lib/people/queries";
+import { createClient } from "@/lib/supabase/server";
 
-export default function NewPersonPage() {
+export default async function NewPersonPage() {
+  const supabase = await createClient();
+  const companies = await getCompanySuggestions(supabase);
+
   return (
     <main className="mx-auto max-w-2xl p-6">
       <div className="mb-4">
@@ -12,7 +17,11 @@ export default function NewPersonPage() {
         </Link>
       </div>
       <h1 className="mb-6 text-xl font-semibold">Add person</h1>
-      <PersonForm action={createPerson} submitLabel="Add person" />
+      <PersonForm
+        action={createPerson}
+        submitLabel="Add person"
+        companies={companies}
+      />
     </main>
   );
 }

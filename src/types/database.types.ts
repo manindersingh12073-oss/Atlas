@@ -306,6 +306,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_event_and_link: {
+        Args: {
+          p_description?: string
+          p_encounter_note?: string
+          p_event_date?: string
+          p_location?: string
+          p_name: string
+          p_person_id: string
+        }
+        Returns: string
+      }
+      create_person_and_link: {
+        Args: {
+          p_company?: string
+          p_email?: string
+          p_encounter_note?: string
+          p_event_id: string
+          p_linkedin_url?: string
+          p_name: string
+          p_notes?: string
+          p_phone?: string
+          p_role?: string
+        }
+        Returns: string
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

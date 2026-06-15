@@ -16,6 +16,8 @@ type Props = {
     notes?: string | null;
   };
   submitLabel?: string;
+  /** Case-deduplicated company names from the user's existing people. */
+  companies?: string[];
 };
 
 const inputClass =
@@ -25,6 +27,7 @@ export function PersonForm({
   action,
   defaultValues,
   submitLabel = "Save",
+  companies,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, { error: null });
 
@@ -58,9 +61,18 @@ export function PersonForm({
           id="company"
           name="company"
           type="text"
+          list={companies && companies.length > 0 ? "company-suggestions" : undefined}
           defaultValue={defaultValues?.company ?? ""}
           className={inputClass}
+          autoComplete="off"
         />
+        {companies && companies.length > 0 && (
+          <datalist id="company-suggestions">
+            {companies.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+        )}
       </div>
 
       <div>

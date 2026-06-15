@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DeletePersonButton } from "@/components/people/DeletePersonButton";
+import { RemovePersonButton } from "@/components/event-people/RemovePersonButton";
 import { deletePerson } from "@/lib/people/actions";
+import { removeEventFromPerson } from "@/lib/event-people/actions";
 import { createClient } from "@/lib/supabase/server";
 
 function formatTimestamp(iso: string) {
@@ -140,12 +142,28 @@ export default async function PersonDetailPage({ params }: Props) {
 
       {/* ── Events section ─────────────────────────────────────────── */}
       <section className="mt-6">
-        <h2 className="text-base font-semibold">
-          Events{" "}
-          <span className="text-sm font-normal text-gray-500">
-            ({eventLinks.length})
-          </span>
-        </h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-base font-semibold">
+            Events{" "}
+            <span className="text-sm font-normal text-gray-500">
+              ({eventLinks.length})
+            </span>
+          </h2>
+          <div className="flex shrink-0 gap-2">
+            <Link
+              href={`/people/${person.id}/link-event`}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+            >
+              Link existing event
+            </Link>
+            <Link
+              href={`/people/${person.id}/add-event`}
+              className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+            >
+              Create new event
+            </Link>
+          </div>
+        </div>
 
         {eventLinks.length === 0 ? (
           <p className="mt-3 text-sm text-gray-500">
@@ -156,25 +174,38 @@ export default async function PersonDetailPage({ params }: Props) {
             {eventLinks.map((link) => {
               if (!link.events) return null;
               const event = link.events;
+              const removeAction = removeEventFromPerson.bind(
+                null,
+                person.id,
+                event.id,
+              );
               return (
                 <li key={event.id} className="px-4 py-3">
-                  <Link
-                    href={`/events/${event.id}`}
-                    className="text-sm font-medium hover:underline"
-                  >
-                    {event.name}
-                  </Link>
-                  {event.event_date && (
-                    <p className="text-xs text-gray-500">
-                      {formatEventDate(event.event_date)}
-                      {event.location ? ` · ${event.location}` : ""}
-                    </p>
-                  )}
-                  {link.encounter_note && (
-                    <p className="mt-1 text-xs italic text-gray-500">
-                      {link.encounter_note}
-                    </p>
-                  )}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/events/${event.id}`}
+                        className="text-sm font-medium hover:underline"
+                      >
+                        {event.name}
+                      </Link>
+                      {event.event_date && (
+                        <p className="text-xs text-gray-500">
+                          {formatEventDate(event.event_date)}
+                          {event.location ? ` · ${event.location}` : ""}
+                        </p>
+                      )}
+                      {link.encounter_note && (
+                        <p className="mt-1 text-xs italic text-gray-500">
+                          {link.encounter_note}
+                        </p>
+                      )}
+                    </div>
+                    <RemovePersonButton
+                      removeAction={removeAction}
+                      confirmMessage="Remove this event from the person's history?"
+                    />
+                  </div>
                 </li>
               );
             })}

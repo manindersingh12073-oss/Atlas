@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PersonForm } from "@/components/people/PersonForm";
 import { updatePerson } from "@/lib/people/actions";
 import type { ActionState } from "@/lib/people/actions";
+import { getCompanySuggestions } from "@/lib/people/queries";
 import { createClient } from "@/lib/supabase/server";
 
 type Props = { params: Promise<{ id: string }> };
@@ -12,15 +13,17 @@ export default async function EditPersonPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: person } = await supabase
-    .from("people")
-    .select("id, name, company, role, linkedin_url, email, phone, notes")
-    .eq("id", id)
-    .single();
+  const [{ data: person }, companies] = await Promise.all([
+    supabase
+      .from("people")
+      .select("id, name, company, role, linkedin_url, email, phone, notes")
+      .eq("id", id)
+      .single(),
+    getCompanySuggestions(supabase),
+  ]);
 
   if (!person) notFound();
 
-  // Bind the id so the action signature matches what PersonForm (useActionState) expects.
   const updatePersonWithId = updatePerson.bind(null, person.id) as (
     state: ActionState,
     formData: FormData,
@@ -41,6 +44,7 @@ export default async function EditPersonPage({ params }: Props) {
         action={updatePersonWithId}
         defaultValues={person}
         submitLabel="Save changes"
+        companies={companies}
       />
     </main>
   );
