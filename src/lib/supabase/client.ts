@@ -1,19 +1,15 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 import { env } from "@/lib/env";
+import type { Database } from "@/types/database.types";
 
 /**
  * Supabase client for use in the BROWSER (Client Components).
- *
- * Reads/writes the auth session from cookies that the server and middleware
- * keep in sync. Use this only in files marked "use client".
- *
- * Phase 2: parameterise with the generated `Database` type once
- * `src/types/database.types.ts` is generated:
- *   createBrowserClient<Database>(...)
+ * Parameterised with Database for fully typed queries.
+ * Re-run `npm run db:types` after any schema migration to keep types current.
  */
 export function createClient() {
-  return createBrowserClient(
+  return createBrowserClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );

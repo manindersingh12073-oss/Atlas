@@ -2,19 +2,18 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 import { env } from "@/lib/env";
+import type { Database } from "@/types/database.types";
 
 /**
  * Supabase client for use on the SERVER — Server Components, Route Handlers,
  * and Server Actions. Each request gets its own client bound to that request's
- * cookies, so the user's session is read correctly per-request.
- *
- * Always create a fresh client per request (do not cache at module scope):
- * cookies() is request-scoped.
+ * cookies. Parameterised with Database for fully typed queries.
+ * Re-run `npm run db:types` after any schema migration to keep types current.
  */
 export async function createClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createServerClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
@@ -29,9 +28,8 @@ export async function createClient() {
             );
           } catch {
             // `setAll` was called from a Server Component, where setting cookies
-            // is not allowed. This is safe to ignore because the proxy
-            // (src/proxy.ts) refreshes the session and writes cookies on
-            // every request.
+            // is not allowed. Safe to ignore — the proxy (src/proxy.ts) handles
+            // session refresh and cookie writes on every request.
           }
         },
       },
