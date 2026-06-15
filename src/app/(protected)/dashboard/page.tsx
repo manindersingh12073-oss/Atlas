@@ -1,10 +1,8 @@
+import Link from "next/link";
+
 import { signOut } from "@/lib/auth/actions";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * TEMPORARY authentication test page. Confirms the session is readable
- * server-side and that logout works. Replaced by the real app in a later phase.
- */
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -12,15 +10,23 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-      <h1 className="text-2xl font-semibold">Signed in ✓</h1>
-      <p className="text-gray-500">{user?.email}</p>
-      <p className="text-xs text-gray-400">Temporary auth test page.</p>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8 text-center">
+      <div>
+        <h1 className="text-2xl font-semibold">Atlas</h1>
+        <p className="mt-1 text-sm text-gray-500">{user?.email}</p>
+      </div>
+
+      <Link
+        href="/people"
+        className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+      >
+        People →
+      </Link>
 
       <form action={signOut}>
         <button
           type="submit"
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          className="text-sm text-gray-400 hover:underline"
         >
           Sign out
         </button>
