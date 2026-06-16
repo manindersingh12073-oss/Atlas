@@ -5,7 +5,12 @@ import { createPerson } from "@/lib/people/actions";
 import { getCompanySuggestions } from "@/lib/people/queries";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function NewPersonPage() {
+type Props = {
+  searchParams: Promise<{ name?: string }>;
+};
+
+export default async function NewPersonPage({ searchParams }: Props) {
+  const { name: prefillName } = await searchParams;
   const supabase = await createClient();
   const companies = await getCompanySuggestions(supabase);
 
@@ -21,6 +26,7 @@ export default async function NewPersonPage() {
         action={createPerson}
         submitLabel="Add person"
         companies={companies}
+        defaultValues={prefillName ? { name: prefillName } : undefined}
       />
     </main>
   );
