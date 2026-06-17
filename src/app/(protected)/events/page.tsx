@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { SearchInput } from "@/components/SearchInput";
 import { SortSelect } from "@/components/SortSelect";
 import {
+  DEFAULT_EVENT_SORT,
   EVENT_SORT_OPTIONS,
-  getEvents,
   parseEventSort,
+  searchEvents,
 } from "@/lib/events/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,15 +21,17 @@ function formatEventDate(dateStr: string): string {
 }
 
 type Props = {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string }>;
 };
 
 export default async function EventsPage({ searchParams }: Props) {
-  const { sort: sortParam } = await searchParams;
+  const { q, sort: sortParam } = await searchParams;
+  const query = q?.trim() ?? "";
   const sort = parseEventSort(sortParam);
+  const hasQuery = query.length > 0;
 
   const supabase = await createClient();
-  const events = await getEvents(supabase, sort);
+  const events = await searchEvents(supabase, query, sort);
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -47,18 +51,49 @@ export default async function EventsPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      <div className="mb-6">
-        <Suspense
-          fallback={
-            <select disabled className="cursor-not-allowed rounded border border-gray-300 px-2 py-1.5 text-sm opacity-50">
-              <option>
-                {EVENT_SORT_OPTIONS.find((o) => o.value === sort)?.label}
-              </option>
-            </select>
-          }
-        >
-          <SortSelect options={EVENT_SORT_OPTIONS} value={sort} />
-        </Suspense>
+      <div className="mb-6 space-y-2">
+        <div className="flex items-center gap-2">
+          {/* Form wrapper keeps Enter-key submission working as a GET fallback. */}
+          <form method="GET" action="/events" className="flex-1">
+            <SearchInput
+              defaultValue={query}
+              currentSort={sort}
+              defaultSort={DEFAULT_EVENT_SORT}
+              pathname="/events"
+              placeholder="Search by name, location or description…"
+            />
+          </form>
+          <Suspense
+            fallback={
+              <select
+                disabled
+                className="cursor-not-allowed rounded border border-gray-300 px-2 py-1.5 text-sm opacity-50"
+              >
+                <option>
+                  {EVENT_SORT_OPTIONS.find((o) => o.value === sort)?.label}
+                </option>
+              </select>
+            }
+          >
+            <SortSelect
+              options={EVENT_SORT_OPTIONS}
+              value={hasQuery ? DEFAULT_EVENT_SORT : sort}
+              disabled={hasQuery}
+            />
+          </Suspense>
+        </div>
+        {hasQuery && (
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              {events.length}{" "}
+              {events.length === 1 ? "result" : "results"} for{" "}
+              <span className="font-medium">&ldquo;{query}&rdquo;</span>
+            </p>
+            <Link href="/events" className="text-xs text-gray-500 hover:underline">
+              Clear search
+            </Link>
+          </div>
+        )}
       </div>
 
       {events.length > 0 ? (
@@ -95,6 +130,27 @@ export default async function EventsPage({ searchParams }: Props) {
             </li>
           ))}
         </ul>
+      ) : hasQuery ? (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">
+            No events found matching{" "}
+            <span className="font-medium">&ldquo;{query}&rdquo;</span>.
+          </p>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/events/new"
+              className="rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              Add event
+            </Link>
+            <Link
+              href="/events"
+              className="text-sm text-gray-500 hover:underline"
+            >
+              Clear search
+            </Link>
+          </div>
+        </div>
       ) : (
         <p className="text-sm text-gray-500">
           No events yet.{" "}

@@ -41,6 +41,69 @@ export type EventWithCount = {
 };
 
 /**
+ * Searches events across name, location, and description fields.
+ * Three parallel ILIKE queries, one per field, merged and deduplicated by id
+ * in JS — the same pattern used by People Search.
+ *
+ * Name results are merged first so relevance ordering favours name matches
+ * over location or description matches.
+ *
+ * Empty query delegates to getEvents() so list/sort behaviour is unchanged.
+ * Sort param is ignored during active search (results sorted alphabetically).
+ * People count is attached from a parallel event_people query.
+ */
+export async function searchEvents(
+  supabase: SupabaseClient<Database>,
+  query: string,
+  sort: EventSort,
+): Promise<EventWithCount[]> {
+  const q = query.trim();
+
+  if (!q) return getEvents(supabase, sort);
+
+  const ilikePattern = `%${q.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
+
+  const [nameResult, locationResult, descResult, countsResult] = await Promise.all([
+    supabase.from("events").select("id, name, event_date, location").ilike("name", ilikePattern),
+    supabase.from("events").select("id, name, event_date, location").ilike("location", ilikePattern),
+    supabase.from("events").select("id, name, event_date, location").ilike("description", ilikePattern),
+    supabase.from("event_people").select("event_id"),
+  ]);
+
+  // Merge name → location → description, deduplicate by id.
+  const seen = new Set<string>();
+  const combined: Array<{
+    id: string;
+    name: string;
+    event_date: string | null;
+    location: string | null;
+  }> = [];
+
+  for (const event of [
+    ...(nameResult.data ?? []),
+    ...(locationResult.data ?? []),
+    ...(descResult.data ?? []),
+  ]) {
+    if (!seen.has(event.id)) {
+      seen.add(event.id);
+      combined.push(event);
+    }
+  }
+
+  combined.sort((a, b) => a.name.localeCompare(b.name));
+
+  const countMap = new Map<string, number>();
+  for (const row of countsResult.data ?? []) {
+    countMap.set(row.event_id, (countMap.get(row.event_id) ?? 0) + 1);
+  }
+
+  return combined.map((e) => ({
+    ...e,
+    people_count: countMap.get(e.id) ?? 0,
+  }));
+}
+
+/**
  * Fetches events with a per-event people count.
  * Two parallel queries (events + event_people) merged in JS.
  * "Most people" / "Fewest people" sorts are applied client-side after joining.
