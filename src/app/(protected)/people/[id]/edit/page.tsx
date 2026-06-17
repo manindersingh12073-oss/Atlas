@@ -45,6 +45,7 @@ export default async function EditPersonPage({ params }: Props) {
         defaultValues={person}
         submitLabel="Save changes"
         companies={companies}
+        excludeId={person.id}
       />
     </main>
   );

@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import Link from "next/link";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import type { ActionState } from "@/lib/people/actions";
+import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -16,8 +18,20 @@ type Props = {
     notes?: string | null;
   };
   submitLabel?: string;
-  /** Case-deduplicated company names from the user's existing people. */
   companies?: string[];
+  /**
+   * When editing an existing person, pass their id to exclude them from
+   * duplicate suggestions (avoids flagging the person as a duplicate of
+   * themselves).
+   */
+  excludeId?: string;
+};
+
+type SimilarPerson = {
+  id: string;
+  name: string;
+  company: string | null;
+  role: string | null;
 };
 
 const inputClass =
@@ -28,8 +42,42 @@ export function PersonForm({
   defaultValues,
   submitLabel = "Save",
   companies,
+  excludeId,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, { error: null });
+  const [suggestions, setSuggestions] = useState<SimilarPerson[]>([]);
+  const nameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (nameTimerRef.current) clearTimeout(nameTimerRef.current);
+    };
+  }, []);
+
+  async function checkForDuplicates(name: string) {
+    const trimmed = name.trim();
+    if (trimmed.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    const supabase = createClient();
+    const escaped = trimmed.replace(/%/g, "\\%").replace(/_/g, "\\_");
+    const { data } = await supabase
+      .from("people")
+      .select("id, name, company, role")
+      .ilike("name", `%${escaped}%`)
+      .limit(5);
+
+    setSuggestions(
+      (data ?? []).filter((p) => p.id !== excludeId),
+    );
+  }
+
+  function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    if (nameTimerRef.current) clearTimeout(nameTimerRef.current);
+    nameTimerRef.current = setTimeout(() => checkForDuplicates(value), 300);
+  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -49,8 +97,38 @@ export function PersonForm({
           type="text"
           required
           defaultValue={defaultValues?.name ?? ""}
+          onChange={handleNameChange}
           className={inputClass}
         />
+        {suggestions.length > 0 && (
+          <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3">
+            <p className="mb-2 text-xs font-medium text-amber-800">
+              Similar contacts already exist:
+            </p>
+            <ul className="space-y-2">
+              {suggestions.map((s) => (
+                <li key={s.id} className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium">{s.name}</span>
+                    {(s.role || s.company) && (
+                      <span className="ml-1.5 text-xs text-gray-500">
+                        {[s.role, s.company].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </div>
+                  <Link
+                    href={`/people/${s.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-xs text-blue-600 hover:underline"
+                  >
+                    View →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div>

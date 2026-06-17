@@ -3,36 +3,41 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useTransition } from "react";
 
+import { DEFAULT_PEOPLE_SORT } from "@/lib/people/queries";
+
 /**
- * Controlled search input that updates the URL as the user types.
- *
- * On each keystroke, a 300ms debounce fires router.replace("/people?q=…"),
- * which triggers a server-side re-render of the people list with fresh results.
- * router.replace (not push) keeps the browser history clean — back button
- * skips over intermediate queries rather than replaying each one.
- *
- * The form wrapper in the parent page handles Enter-key submission as a
- * native GET request, which produces the same URL and behaves identically.
+ * Debounced search input for the people page.
+ * Accepts currentSort as a prop so it can preserve the sort param in URL
+ * updates without needing useSearchParams (which requires a Suspense boundary).
  */
-export function PeopleSearchInput({ defaultValue }: { defaultValue: string }) {
+export function PeopleSearchInput({
+  defaultValue,
+  currentSort,
+}: {
+  defaultValue: string;
+  currentSort: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function buildUrl(q: string): string {
+    const params = new URLSearchParams();
+    if (q.trim()) params.set("q", q.trim());
+    if (currentSort && currentSort !== DEFAULT_PEOPLE_SORT)
+      params.set("sort", currentSort);
+    const qs = params.toString();
+    return `/people${qs ? `?${qs}` : ""}`;
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
-
     if (timerRef.current) clearTimeout(timerRef.current);
-
     timerRef.current = setTimeout(() => {
-      const url = value.trim()
-        ? `/people?q=${encodeURIComponent(value.trim())}`
-        : "/people";
-      startTransition(() => router.replace(url));
+      startTransition(() => router.replace(buildUrl(value)));
     }, 300);
   }
 
-  // Clear any pending timer if the component unmounts.
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
