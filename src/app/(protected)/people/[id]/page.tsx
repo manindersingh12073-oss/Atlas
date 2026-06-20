@@ -1,11 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CompleteFollowUpButton } from "@/components/follow-ups/CompleteFollowUpButton";
+import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButton";
+import { SnoozeFollowUpButton } from "@/components/follow-ups/SnoozeFollowUpButton";
 import { DeletePersonButton } from "@/components/people/DeletePersonButton";
 import { RemovePersonButton } from "@/components/event-people/RemovePersonButton";
+import { completeFollowUp, deleteFollowUp, snoozeFollowUp } from "@/lib/follow-ups/actions";
+import type { FollowUp } from "@/lib/follow-ups/queries";
 import { deletePerson } from "@/lib/people/actions";
 import { removeEventFromPerson } from "@/lib/event-people/actions";
 import { createClient } from "@/lib/supabase/server";
+
+// Parses YYYY-MM-DD as a local date for display — avoids UTC day-shift.
+function formatDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 function formatTimestamp(iso: string) {
   return new Date(iso).toLocaleString("en-GB", {
@@ -44,7 +59,7 @@ export default async function PersonDetailPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [personResult, eventLinksResult] = await Promise.all([
+  const [personResult, eventLinksResult, followUpsResult] = await Promise.all([
     supabase
       .from("people")
       .select(
@@ -56,12 +71,22 @@ export default async function PersonDetailPage({ params }: Props) {
       .from("event_people")
       .select("encounter_note, events(id, name, event_date, location)")
       .eq("person_id", id),
+    supabase
+      .from("follow_ups")
+      .select("id, person_id, due_date, note, status, completed_at, created_at")
+      .eq("person_id", id)
+      .order("due_date", { ascending: true }),
   ]);
 
   if (!personResult.data) notFound();
 
   const person = personResult.data;
   const deletePersonWithId = deletePerson.bind(null, person.id);
+
+  const allFollowUps = (followUpsResult.data ?? []) as FollowUp[];
+  const today = new Date().toISOString().split("T")[0];
+  const activeFollowUps = allFollowUps.filter((f) => f.status !== "done");
+  const doneFollowUps = allFollowUps.filter((f) => f.status === "done");
 
   // Sort events by event_date descending, nulls last.
   // YYYY-MM-DD strings compare correctly with localeCompare.
@@ -205,6 +230,90 @@ export default async function PersonDetailPage({ params }: Props) {
                       removeAction={removeAction}
                       confirmMessage="Remove this event from the person's history?"
                     />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* ── Follow-ups section ─────────────────────────────────────────── */}
+      <section className="mt-6">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-base font-semibold">
+            Follow-ups{" "}
+            <span className="text-sm font-normal text-gray-500">
+              ({activeFollowUps.length})
+            </span>
+          </h2>
+          <Link
+            href={`/people/${person.id}/follow-ups/new`}
+            className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+          >
+            Add follow-up
+          </Link>
+        </div>
+
+        {allFollowUps.length === 0 ? (
+          <p className="mt-3 text-sm text-gray-500">No follow-ups yet.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-gray-100 rounded border border-gray-200">
+            {activeFollowUps.map((f) => {
+              const isOverdue = f.status !== "done" && f.due_date < today;
+              const completeAction = completeFollowUp.bind(null, f.id, person.id);
+              const snoozeAction = snoozeFollowUp.bind(null, f.id, person.id);
+              const deleteAction = deleteFollowUp.bind(null, f.id, person.id);
+              return (
+                <li key={f.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p
+                        className={`text-sm font-medium ${isOverdue ? "text-red-600" : ""}`}
+                      >
+                        {formatDate(f.due_date)}
+                        {f.status === "snoozed" && (
+                          <span className="ml-2 text-xs font-normal text-amber-600">
+                            snoozed
+                          </span>
+                        )}
+                        {isOverdue && (
+                          <span className="ml-2 text-xs font-normal">
+                            overdue
+                          </span>
+                        )}
+                      </p>
+                      {f.note && (
+                        <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <CompleteFollowUpButton completeAction={completeAction} />
+                      <SnoozeFollowUpButton snoozeAction={snoozeAction} />
+                      <Link
+                        href={`/people/${person.id}/follow-ups/${f.id}/edit`}
+                        className="text-xs text-gray-500 hover:underline"
+                      >
+                        Edit
+                      </Link>
+                      <DeleteFollowUpButton deleteAction={deleteAction} />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+            {doneFollowUps.map((f) => {
+              const deleteAction = deleteFollowUp.bind(null, f.id, person.id);
+              return (
+                <li key={f.id} className="px-4 py-3 opacity-50">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm line-through">{formatDate(f.due_date)}</p>
+                      {f.note && (
+                        <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
+                      )}
+                    </div>
+                    <DeleteFollowUpButton deleteAction={deleteAction} />
                   </div>
                 </li>
               );
