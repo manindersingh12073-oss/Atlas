@@ -8,15 +8,20 @@ import { UncompleteFollowUpButton } from "@/components/follow-ups/UncompleteFoll
 import { DeletePersonButton } from "@/components/people/DeletePersonButton";
 import { RemovePersonButton } from "@/components/event-people/RemovePersonButton";
 import { PersonTimeline } from "@/components/people/PersonTimeline";
+import { RelationshipPicker } from "@/components/relationships/RelationshipPicker";
+import { RemoveRelationshipButton } from "@/components/relationships/RemoveRelationshipButton";
 import { TagChip } from "@/components/tags/TagChip";
 import { TagPicker } from "@/components/tags/TagPicker";
 import { completeFollowUp, deleteFollowUp, snoozeFollowUp, uncompleteFollowUp } from "@/lib/follow-ups/actions";
 import type { FollowUp } from "@/lib/follow-ups/queries";
 import { deletePerson } from "@/lib/people/actions";
 import { removeEventFromPerson } from "@/lib/event-people/actions";
+import { removeRelationship } from "@/lib/relationships/actions";
+import { getDisplayLabel, getPersonRelationships } from "@/lib/relationships/queries";
 import { removeTagFromPerson } from "@/lib/tags/actions";
 import { buildTimeline } from "@/lib/people/timeline";
 import { getPersonTags, getTagsWithCounts } from "@/lib/tags/queries";
+import { getRecentPeople } from "@/lib/capture/queries";
 import { createClient } from "@/lib/supabase/server";
 
 // Parses YYYY-MM-DD as a local date for display — avoids UTC day-shift.
@@ -67,7 +72,7 @@ export default async function PersonDetailPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [personResult, eventLinksResult, followUpsResult, personTags, allTagsWithCounts] =
+  const [personResult, eventLinksResult, followUpsResult, personTags, allTagsWithCounts, relationships, recentPeople] =
     await Promise.all([
       supabase
         .from("people")
@@ -87,6 +92,8 @@ export default async function PersonDetailPage({ params }: Props) {
         .order("due_date", { ascending: true }),
       getPersonTags(supabase, id),
       getTagsWithCounts(supabase),
+      getPersonRelationships(supabase, id),
+      getRecentPeople(supabase),
     ]);
 
   if (!personResult.data) notFound();
@@ -110,7 +117,7 @@ export default async function PersonDetailPage({ params }: Props) {
     },
   );
 
-  const timeline = buildTimeline(person, eventLinks, allFollowUps);
+  const timeline = buildTimeline(person, eventLinks, allFollowUps, relationships);
 
   const contactFields = [
     { label: "Email", value: person.email },
@@ -357,6 +364,51 @@ export default async function PersonDetailPage({ params }: Props) {
             })}
           </ul>
         )}
+      </section>
+
+      {/* ── Relationships section ──────────────────────────────────────── */}
+      <section className="mt-6">
+        <h2 className="mb-3 text-base font-semibold">Relationships</h2>
+        {relationships.length > 0 && (
+          <ul className="mb-3 divide-y divide-gray-100 rounded border border-gray-200">
+            {relationships.map((rel) => {
+              const isPersonA = rel.person_a === person.id;
+              const other = isPersonA ? rel.b : rel.a;
+              const label = getDisplayLabel(
+                rel.type as Parameters<typeof getDisplayLabel>[0],
+                isPersonA,
+                other?.name ?? "",
+              );
+              const removeAction = removeRelationship.bind(
+                null,
+                rel.id,
+                rel.person_a,
+                rel.person_b,
+              );
+              return (
+                <li key={rel.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-700">{label}</p>
+                    {other && (
+                      <Link
+                        href={`/people/${other.id}`}
+                        className="text-xs text-gray-500 hover:underline"
+                      >
+                        {other.name}
+                      </Link>
+                    )}
+                  </div>
+                  <RemoveRelationshipButton removeAction={removeAction} />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <RelationshipPicker
+          personId={person.id}
+          recentPeople={recentPeople}
+          redirectTo={`/people/${person.id}`}
+        />
       </section>
 
       <PersonTimeline items={timeline} />

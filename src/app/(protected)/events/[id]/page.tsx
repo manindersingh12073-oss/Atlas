@@ -86,6 +86,12 @@ export default async function EventDetailPage({ params }: Props) {
         </div>
         <div className="flex shrink-0 gap-2">
           <Link
+            href={`/events/${event.id}/capture`}
+            className="rounded border border-gray-800 bg-gray-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
+          >
+            Capture people →
+          </Link>
+          <Link
             href={`/events/${event.id}/edit`}
             className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
           >

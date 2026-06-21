@@ -205,6 +205,55 @@ export type Database = {
           },
         ]
       }
+      person_relationships: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          person_a: string
+          person_b: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          person_a: string
+          person_b: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          person_a?: string
+          person_b?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_relationships_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_relationships_person_a_fkey"
+            columns: ["person_a"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_relationships_person_b_fkey"
+            columns: ["person_b"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       person_tags: {
         Row: {
           owner_id: string

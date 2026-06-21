@@ -12,7 +12,8 @@ export type TimelineItemType =
   | "event_attended"
   | "follow_up_created"
   | "follow_up_completed"
-  | "follow_up_rescheduled";
+  | "follow_up_rescheduled"
+  | "relationship_created";
 
 export type TimelineItem = {
   id: string;
@@ -77,10 +78,33 @@ function formatTimestamp(iso: string): string {
 
 // ── Builder ───────────────────────────────────────────────────────────────────
 
+type RelationshipInput = {
+  id: string;
+  type: string;
+  created_at: string;
+  person_a: string;
+  a: { name: string } | null;
+  b: { name: string } | null;
+};
+
+// Imported inline to avoid circular dependency between timeline and relationships modules.
+function getRelationshipLabel(type: string, isPersonA: boolean, otherName: string): string {
+  switch (type) {
+    case "met_together": return `Met together with ${otherName}`;
+    case "introduced_by":
+      return isPersonA ? `Introduced by ${otherName}` : `Introduced ${otherName}`;
+    case "works_with": return `Works with ${otherName}`;
+    case "co_founder": return `Co-founder with ${otherName}`;
+    case "friend": return `Friends with ${otherName}`;
+    default: return `Connected with ${otherName}`;
+  }
+}
+
 export function buildTimeline(
   person: PersonInput,
   eventLinks: EventLinkInput[],
   followUps: FollowUpInput[],
+  relationships: RelationshipInput[] = [],
 ): TimelineItem[] {
   const items: TimelineItem[] = [];
 
@@ -163,6 +187,20 @@ export function buildTimeline(
         detail: `Moved to ${formatLocalDate(fu.due_date)}`,
       });
     }
+  }
+
+  // ── Relationships ──────────────────────────────────────────────────────────
+  for (const rel of relationships) {
+    const isPersonA = rel.person_a === person.id;
+    const otherName = isPersonA ? (rel.b?.name ?? "") : (rel.a?.name ?? "");
+    items.push({
+      id: `relationship-${rel.id}`,
+      type: "relationship_created",
+      sortKey: rel.created_at,
+      displayDate: formatTimestamp(rel.created_at),
+      icon: "🤝",
+      title: getRelationshipLabel(rel.type, isPersonA, otherName),
+    });
   }
 
   // Newest first; ISO strings compare correctly with localeCompare.

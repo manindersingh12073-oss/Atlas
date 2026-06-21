@@ -16,6 +16,7 @@ import {
   getDoneFollowUps,
 } from "@/lib/follow-ups/queries";
 import type { FollowUpWithPerson } from "@/lib/follow-ups/queries";
+import { getCurrentConference } from "@/lib/capture/queries";
 import { createClient } from "@/lib/supabase/server";
 
 // Parses YYYY-MM-DD as a local date for display — avoids UTC day-shift.
@@ -85,10 +86,12 @@ export default async function DashboardPage() {
     },
     { overdue, dueToday, upcoming },
     done,
+    conference,
   ] = await Promise.all([
     supabase.auth.getUser(),
     getDashboardFollowUps(supabase),
     getDoneFollowUps(supabase),
+    getCurrentConference(supabase),
   ]);
 
   const hasActive = overdue.length + dueToday.length + upcoming.length > 0;
@@ -110,6 +113,45 @@ export default async function DashboardPage() {
           </button>
         </form>
       </div>
+
+      {/* ── Current conference (primary action when active) ─────────── */}
+      {conference && (
+        <section className="mb-8 rounded border border-gray-200 p-4">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">
+            Current conference
+          </p>
+          {conference.eventName ? (
+            <h2 className="text-base font-semibold">{conference.eventName}</h2>
+          ) : (
+            <h2 className="text-base font-semibold text-gray-500">No event selected</h2>
+          )}
+          <p className="mt-0.5 text-sm text-gray-500">
+            Captured today: {conference.capturedCount}
+          </p>
+          {conference.recentCaptures.length > 0 && (
+            <ul className="mt-2 space-y-0.5">
+              {conference.recentCaptures.map((p) => (
+                <li key={p.id} className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <span className="text-xs text-green-500">✓</span>
+                  <Link href={`/people/${p.id}`} className="hover:underline">
+                    {p.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            href={
+              conference.eventId
+                ? `/events/${conference.eventId}/capture`
+                : "/capture"
+            }
+            className="mt-4 block rounded border border-gray-800 bg-gray-800 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-gray-700"
+          >
+            Continue →
+          </Link>
+        </section>
+      )}
 
       {/* ── Follow-ups ──────────────────────────────────────────────── */}
       <section className="mb-8">
@@ -181,6 +223,12 @@ export default async function DashboardPage() {
           className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
         >
           Events →
+        </Link>
+        <Link
+          href="/capture"
+          className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        >
+          Capture →
         </Link>
       </div>
     </main>
