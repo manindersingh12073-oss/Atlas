@@ -3,6 +3,11 @@ import { Suspense } from "react";
 
 import { PeopleSearchInput } from "@/components/people/PeopleSearchInput";
 import { SortSelect } from "@/components/SortSelect";
+import { TagChip } from "@/components/tags/TagChip";
+import { TagFilterBar } from "@/components/tags/TagFilterBar";
+import { TagPicker } from "@/components/tags/TagPicker";
+import { removeTagFromPerson } from "@/lib/tags/actions";
+import { getPersonTagsMap, getTagsWithCounts } from "@/lib/tags/queries";
 import {
   DEFAULT_PEOPLE_SORT,
   PEOPLE_SORT_OPTIONS,
@@ -13,25 +18,30 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 type Props = {
-  searchParams: Promise<{ q?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; tags?: string }>;
 };
 
 export default async function PeoplePage({ searchParams }: Props) {
-  const { q, sort: sortParam } = await searchParams;
+  const { q, sort: sortParam, tags: tagsParam } = await searchParams;
   const query = q?.trim() ?? "";
   const sort = parsePeopleSort(sortParam);
   const hasQuery = query.length > 0;
+  const selectedTagIds = tagsParam
+    ? tagsParam.split(",").filter(Boolean)
+    : [];
 
   const supabase = await createClient();
 
-  const [people, eventDataMap] = await Promise.all([
-    searchPeople(supabase, query, sort),
-    getPersonEventData(supabase),
-  ]);
+  const [people, eventDataMap, allTagsWithCounts, personTagsMap] =
+    await Promise.all([
+      searchPeople(supabase, query, sort),
+      getPersonEventData(supabase),
+      getTagsWithCounts(supabase),
+      getPersonTagsMap(supabase),
+    ]);
 
-  // "Most events" sort is applied in JS after joining event counts.
-  // When a search query is active, results are always name-sorted (sort ignored).
-  const displayPeople =
+  // "Most events" sort applied in JS after joining counts.
+  let displayPeople =
     !hasQuery && sort === "events_desc"
       ? [...people].sort((a, b) => {
           const ca = eventDataMap.get(a.id)?.event_count ?? 0;
@@ -39,6 +49,22 @@ export default async function PeoplePage({ searchParams }: Props) {
           return cb - ca;
         })
       : people;
+
+  // AND tag filter: keep only people who have every selected tag.
+  if (selectedTagIds.length > 0) {
+    displayPeople = displayPeople.filter((p) => {
+      const personTagIds = new Set(
+        (personTagsMap.get(p.id) ?? []).map((t) => t.id),
+      );
+      return selectedTagIds.every((id) => personTagIds.has(id));
+    });
+  }
+
+  const hasTagFilter = selectedTagIds.length > 0;
+
+  // "Clear search" preserves the active tag filter.
+  const clearSearchHref =
+    hasTagFilter ? `/people?tags=${selectedTagIds.join(",")}` : "/people";
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -59,14 +85,17 @@ export default async function PeoplePage({ searchParams }: Props) {
       </div>
 
       <div className="mb-6 space-y-2">
+        {/* Search + sort row */}
         <div className="flex items-center gap-2">
-          {/* Form wrapper keeps Enter-key submission working as a GET fallback. */}
           <form method="GET" action="/people" className="flex-1">
             <PeopleSearchInput defaultValue={query} currentSort={sort} />
           </form>
           <Suspense
             fallback={
-              <select disabled className="cursor-not-allowed rounded border border-gray-300 px-2 py-1.5 text-sm opacity-50">
+              <select
+                disabled
+                className="cursor-not-allowed rounded border border-gray-300 px-2 py-1.5 text-sm opacity-50"
+              >
                 <option>
                   {PEOPLE_SORT_OPTIONS.find((o) => o.value === sort)?.label}
                 </option>
@@ -80,16 +109,39 @@ export default async function PeoplePage({ searchParams }: Props) {
             />
           </Suspense>
         </div>
-        {hasQuery && (
+
+        {/* Tag filter bar */}
+        {allTagsWithCounts.length > 0 && (
+          <TagFilterBar
+            allTags={allTagsWithCounts}
+            selectedTagIds={selectedTagIds}
+            pathname="/people"
+            currentQ={query}
+            currentSort={sort}
+          />
+        )}
+
+        {/* Active filter summary */}
+        {(hasQuery || hasTagFilter) && (
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">
               {displayPeople.length}{" "}
-              {displayPeople.length === 1 ? "result" : "results"} for{" "}
-              <span className="font-medium">&ldquo;{query}&rdquo;</span>
+              {displayPeople.length === 1 ? "result" : "results"}
+              {hasQuery && (
+                <>
+                  {" "}for{" "}
+                  <span className="font-medium">&ldquo;{query}&rdquo;</span>
+                </>
+              )}
             </p>
-            <Link href="/people" className="text-xs text-gray-500 hover:underline">
-              Clear search
-            </Link>
+            {hasQuery && (
+              <Link
+                href={clearSearchHref}
+                className="text-xs text-gray-500 hover:underline"
+              >
+                Clear search
+              </Link>
+            )}
           </div>
         )}
       </div>
@@ -98,13 +150,15 @@ export default async function PeoplePage({ searchParams }: Props) {
         <ul className="divide-y divide-gray-100 rounded border border-gray-200">
           {displayPeople.map((person) => {
             const ed = eventDataMap.get(person.id);
+            const personTags = personTagsMap.get(person.id) ?? [];
             return (
-              <li key={person.id}>
-                <Link
-                  href={`/people/${person.id}`}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
-                >
-                  <div className="min-w-0">
+              <li key={person.id} className="px-4 py-3 hover:bg-gray-50">
+                {/* Top row: person info + arrow */}
+                <div className="flex items-start justify-between gap-4">
+                  <Link
+                    href={`/people/${person.id}`}
+                    className="min-w-0 flex-1"
+                  >
                     <p className="text-sm font-medium">{person.name}</p>
                     {(person.company || person.role) && (
                       <p className="text-xs text-gray-500">
@@ -122,30 +176,69 @@ export default async function PeoplePage({ searchParams }: Props) {
                             ed.recent_events.map((e) => e.name).join(", ")}
                       </p>
                     )}
-                  </div>
-                  <span className="ml-4 shrink-0 text-sm text-gray-400">→</span>
-                </Link>
+                  </Link>
+                  <Link
+                    href={`/people/${person.id}`}
+                    className="shrink-0 text-sm text-gray-400"
+                    tabIndex={-1}
+                    aria-hidden
+                  >
+                    →
+                  </Link>
+                </div>
+
+                {/* Tag row */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {personTags.map((tag) => (
+                    <TagChip
+                      key={tag.id}
+                      tag={tag}
+                      onRemove={removeTagFromPerson.bind(
+                        null,
+                        person.id,
+                        tag.id,
+                      )}
+                    />
+                  ))}
+                  <TagPicker
+                    personId={person.id}
+                    allTags={allTagsWithCounts}
+                    personTagIds={personTags.map((t) => t.id)}
+                    triggerLabel="+"
+                  />
+                </div>
               </li>
             );
           })}
         </ul>
-      ) : hasQuery ? (
+      ) : hasQuery || hasTagFilter ? (
         <div className="space-y-3">
           <p className="text-sm text-gray-500">
-            No people found matching{" "}
-            <span className="font-medium">&ldquo;{query}&rdquo;</span>.
+            No people found
+            {hasQuery && (
+              <>
+                {" "}matching{" "}
+                <span className="font-medium">&ldquo;{query}&rdquo;</span>
+              </>
+            )}
+            {hasTagFilter && !hasQuery && " with the selected tags"}.
           </p>
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/people/new?name=${encodeURIComponent(query)}`}
-              className="rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Add &ldquo;{query}&rdquo;
-            </Link>
-            <Link href="/people" className="text-sm text-gray-500 hover:underline">
-              Clear search
-            </Link>
-          </div>
+          {hasQuery && (
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/people/new?name=${encodeURIComponent(query)}`}
+                className="rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Add &ldquo;{query}&rdquo;
+              </Link>
+              <Link
+                href={clearSearchHref}
+                className="text-sm text-gray-500 hover:underline"
+              >
+                Clear search
+              </Link>
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-sm text-gray-500">

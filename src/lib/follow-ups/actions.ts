@@ -12,24 +12,38 @@ function nullable(formData: FormData, key: string): string | null {
 }
 
 // ── Snooze date calculation ───────────────────────────────────────────────────
-// To add new options (e.g. "1d" | "30d" | "custom"), extend SnoozeOption and
-// add a case below. Callers pass the option; no other files need to change.
+// To add new options, extend SnoozeOption and add a case below.
+// Callers bind the option at call-site; no other files need to change.
 
-type SnoozeOption = "7d";
+export type SnoozeOption = "1d" | "7d" | "30d";
+
+function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 function getSnoozeDate(currentDueDate: string, option: SnoozeOption): string {
-  // Parse as local date to avoid UTC day-shift in negative-offset timezones.
+  if (option === "1d") {
+    // "Tomorrow" is always relative to today, not the (possibly overdue) due date.
+    const now = new Date();
+    return formatLocalDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  }
+
+  // All other options offset from the current due date. Parse as local date
+  // to avoid UTC day-shift in negative-offset timezones.
   const [year, month, day] = currentDueDate.split("-").map(Number);
   const date = new Date(year, month - 1, day);
   switch (option) {
     case "7d":
       date.setDate(date.getDate() + 7);
       break;
+    case "30d":
+      date.setDate(date.getDate() + 30);
+      break;
   }
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return formatLocalDate(date);
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -63,7 +77,7 @@ export async function createFollowUp(
 
 export async function updateFollowUp(
   id: string,
-  personId: string,
+  redirectTo: string,
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -89,12 +103,12 @@ export async function updateFollowUp(
 
   if (error) return { error: error.message };
 
-  redirect(`/people/${personId}`);
+  redirect(redirectTo);
 }
 
 export async function deleteFollowUp(
   id: string,
-  personId: string,
+  redirectTo: string,
 ): Promise<void> {
   const supabase = await createClient();
   const {
@@ -108,12 +122,31 @@ export async function deleteFollowUp(
     .eq("id", id)
     .eq("owner_id", user.id);
 
-  redirect(`/people/${personId}`);
+  redirect(redirectTo);
+}
+
+export async function uncompleteFollowUp(
+  id: string,
+  redirectTo: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  await supabase
+    .from("follow_ups")
+    .update({ status: "pending", completed_at: null })
+    .eq("id", id)
+    .eq("owner_id", user.id);
+
+  redirect(redirectTo);
 }
 
 export async function completeFollowUp(
   id: string,
-  personId: string,
+  redirectTo: string,
 ): Promise<void> {
   const supabase = await createClient();
   const {
@@ -127,12 +160,13 @@ export async function completeFollowUp(
     .eq("id", id)
     .eq("owner_id", user.id);
 
-  redirect(`/people/${personId}`);
+  redirect(redirectTo);
 }
 
 export async function snoozeFollowUp(
   id: string,
-  personId: string,
+  redirectTo: string,
+  option: SnoozeOption,
 ): Promise<void> {
   const supabase = await createClient();
   const {
@@ -147,9 +181,9 @@ export async function snoozeFollowUp(
     .eq("owner_id", user.id)
     .single();
 
-  if (!existing) redirect(`/people/${personId}`);
+  if (!existing) redirect(redirectTo);
 
-  const newDueDate = getSnoozeDate(existing.due_date, "7d");
+  const newDueDate = getSnoozeDate(existing.due_date, option);
 
   await supabase
     .from("follow_ups")
@@ -157,5 +191,5 @@ export async function snoozeFollowUp(
     .eq("id", id)
     .eq("owner_id", user.id);
 
-  redirect(`/people/${personId}`);
+  redirect(redirectTo);
 }

@@ -3,13 +3,20 @@ import { notFound } from "next/navigation";
 
 import { CompleteFollowUpButton } from "@/components/follow-ups/CompleteFollowUpButton";
 import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButton";
-import { SnoozeFollowUpButton } from "@/components/follow-ups/SnoozeFollowUpButton";
+import { RescheduleFollowUpButtons } from "@/components/follow-ups/RescheduleFollowUpButtons";
+import { UncompleteFollowUpButton } from "@/components/follow-ups/UncompleteFollowUpButton";
 import { DeletePersonButton } from "@/components/people/DeletePersonButton";
 import { RemovePersonButton } from "@/components/event-people/RemovePersonButton";
-import { completeFollowUp, deleteFollowUp, snoozeFollowUp } from "@/lib/follow-ups/actions";
+import { PersonTimeline } from "@/components/people/PersonTimeline";
+import { TagChip } from "@/components/tags/TagChip";
+import { TagPicker } from "@/components/tags/TagPicker";
+import { completeFollowUp, deleteFollowUp, snoozeFollowUp, uncompleteFollowUp } from "@/lib/follow-ups/actions";
 import type { FollowUp } from "@/lib/follow-ups/queries";
 import { deletePerson } from "@/lib/people/actions";
 import { removeEventFromPerson } from "@/lib/event-people/actions";
+import { removeTagFromPerson } from "@/lib/tags/actions";
+import { buildTimeline } from "@/lib/people/timeline";
+import { getPersonTags, getTagsWithCounts } from "@/lib/tags/queries";
 import { createClient } from "@/lib/supabase/server";
 
 // Parses YYYY-MM-DD as a local date for display — avoids UTC day-shift.
@@ -44,6 +51,7 @@ function formatEventDate(dateStr: string): string {
 
 // Shape returned by the nested select on event_people.
 type EventLink = {
+  created_at: string;
   encounter_note: string | null;
   events: {
     id: string;
@@ -59,37 +67,38 @@ export default async function PersonDetailPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [personResult, eventLinksResult, followUpsResult] = await Promise.all([
-    supabase
-      .from("people")
-      .select(
-        "id, name, company, role, linkedin_url, email, phone, notes, created_at, updated_at",
-      )
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("event_people")
-      .select("encounter_note, events(id, name, event_date, location)")
-      .eq("person_id", id),
-    supabase
-      .from("follow_ups")
-      .select("id, person_id, due_date, note, status, completed_at, created_at")
-      .eq("person_id", id)
-      .order("due_date", { ascending: true }),
-  ]);
+  const [personResult, eventLinksResult, followUpsResult, personTags, allTagsWithCounts] =
+    await Promise.all([
+      supabase
+        .from("people")
+        .select(
+          "id, name, company, role, linkedin_url, email, phone, notes, created_at, updated_at",
+        )
+        .eq("id", id)
+        .single(),
+      supabase
+        .from("event_people")
+        .select("encounter_note, created_at, events(id, name, event_date, location)")
+        .eq("person_id", id),
+      supabase
+        .from("follow_ups")
+        .select("id, person_id, due_date, note, status, completed_at, created_at, updated_at")
+        .eq("person_id", id)
+        .order("due_date", { ascending: true }),
+      getPersonTags(supabase, id),
+      getTagsWithCounts(supabase),
+    ]);
 
   if (!personResult.data) notFound();
 
   const person = personResult.data;
   const deletePersonWithId = deletePerson.bind(null, person.id);
 
-  const allFollowUps = (followUpsResult.data ?? []) as FollowUp[];
+  const allFollowUps = (followUpsResult.data ?? []) as (FollowUp & { updated_at: string })[];
   const today = new Date().toISOString().split("T")[0];
   const activeFollowUps = allFollowUps.filter((f) => f.status !== "done");
   const doneFollowUps = allFollowUps.filter((f) => f.status === "done");
 
-  // Sort events by event_date descending, nulls last.
-  // YYYY-MM-DD strings compare correctly with localeCompare.
   const eventLinks = ((eventLinksResult.data ?? []) as EventLink[]).sort(
     (a, b) => {
       const dateA = a.events?.event_date ?? null;
@@ -100,6 +109,8 @@ export default async function PersonDetailPage({ params }: Props) {
       return dateB.localeCompare(dateA);
     },
   );
+
+  const timeline = buildTimeline(person, eventLinks, allFollowUps);
 
   const contactFields = [
     { label: "Email", value: person.email },
@@ -123,6 +134,20 @@ export default async function PersonDetailPage({ params }: Props) {
               {[person.role, person.company].filter(Boolean).join(" · ")}
             </p>
           )}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {personTags.map((tag) => (
+              <TagChip
+                key={tag.id}
+                tag={tag}
+                onRemove={removeTagFromPerson.bind(null, person.id, tag.id)}
+              />
+            ))}
+            <TagPicker
+              personId={person.id}
+              allTags={allTagsWithCounts}
+              personTagIds={personTags.map((t) => t.id)}
+            />
+          </div>
         </div>
         <div className="flex shrink-0 gap-2">
           <Link
@@ -261,9 +286,12 @@ export default async function PersonDetailPage({ params }: Props) {
           <ul className="mt-3 divide-y divide-gray-100 rounded border border-gray-200">
             {activeFollowUps.map((f) => {
               const isOverdue = f.status !== "done" && f.due_date < today;
-              const completeAction = completeFollowUp.bind(null, f.id, person.id);
-              const snoozeAction = snoozeFollowUp.bind(null, f.id, person.id);
-              const deleteAction = deleteFollowUp.bind(null, f.id, person.id);
+              const redirectTo = `/people/${person.id}`;
+              const completeAction = completeFollowUp.bind(null, f.id, redirectTo);
+              const tomorrowAction = snoozeFollowUp.bind(null, f.id, redirectTo, "1d");
+              const sevenDayAction = snoozeFollowUp.bind(null, f.id, redirectTo, "7d");
+              const thirtyDayAction = snoozeFollowUp.bind(null, f.id, redirectTo, "30d");
+              const deleteAction = deleteFollowUp.bind(null, f.id, redirectTo);
               return (
                 <li key={f.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-4">
@@ -287,23 +315,29 @@ export default async function PersonDetailPage({ params }: Props) {
                         <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
                       )}
                     </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <CompleteFollowUpButton completeAction={completeAction} />
-                      <SnoozeFollowUpButton snoozeAction={snoozeAction} />
-                      <Link
-                        href={`/people/${person.id}/follow-ups/${f.id}/edit`}
-                        className="text-xs text-gray-500 hover:underline"
-                      >
-                        Edit
-                      </Link>
-                      <DeleteFollowUpButton deleteAction={deleteAction} />
-                    </div>
+                    <CompleteFollowUpButton completeAction={completeAction} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <RescheduleFollowUpButtons
+                      tomorrowAction={tomorrowAction}
+                      sevenDayAction={sevenDayAction}
+                      thirtyDayAction={thirtyDayAction}
+                    />
+                    <Link
+                      href={`/people/${person.id}/follow-ups/${f.id}/edit`}
+                      className="text-xs text-gray-500 hover:underline"
+                    >
+                      Edit
+                    </Link>
+                    <DeleteFollowUpButton deleteAction={deleteAction} />
                   </div>
                 </li>
               );
             })}
             {doneFollowUps.map((f) => {
-              const deleteAction = deleteFollowUp.bind(null, f.id, person.id);
+              const redirectTo = `/people/${person.id}`;
+              const uncompleteAction = uncompleteFollowUp.bind(null, f.id, redirectTo);
+              const deleteAction = deleteFollowUp.bind(null, f.id, redirectTo);
               return (
                 <li key={f.id} className="px-4 py-3 opacity-50">
                   <div className="flex items-start justify-between gap-4">
@@ -313,7 +347,10 @@ export default async function PersonDetailPage({ params }: Props) {
                         <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
                       )}
                     </div>
-                    <DeleteFollowUpButton deleteAction={deleteAction} />
+                    <div className="flex shrink-0 items-center gap-3">
+                      <UncompleteFollowUpButton uncompleteAction={uncompleteAction} />
+                      <DeleteFollowUpButton deleteAction={deleteAction} />
+                    </div>
                   </div>
                 </li>
               );
@@ -321,6 +358,8 @@ export default async function PersonDetailPage({ params }: Props) {
           </ul>
         )}
       </section>
+
+      <PersonTimeline items={timeline} />
     </main>
   );
 }

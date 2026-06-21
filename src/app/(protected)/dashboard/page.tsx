@@ -1,7 +1,21 @@
 import Link from "next/link";
 
+import { CompleteFollowUpButton } from "@/components/follow-ups/CompleteFollowUpButton";
+import { CompletedFollowUpsSection } from "@/components/follow-ups/CompletedFollowUpsSection";
+import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButton";
+import { RescheduleFollowUpButtons } from "@/components/follow-ups/RescheduleFollowUpButtons";
 import { signOut } from "@/lib/auth/actions";
-import { getDashboardFollowUps } from "@/lib/follow-ups/queries";
+import {
+  completeFollowUp,
+  deleteFollowUp,
+  snoozeFollowUp,
+  uncompleteFollowUp,
+} from "@/lib/follow-ups/actions";
+import {
+  getDashboardFollowUps,
+  getDoneFollowUps,
+} from "@/lib/follow-ups/queries";
+import type { FollowUpWithPerson } from "@/lib/follow-ups/queries";
 import { createClient } from "@/lib/supabase/server";
 
 // Parses YYYY-MM-DD as a local date for display — avoids UTC day-shift.
@@ -14,6 +28,54 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function FollowUpCard({ f, groupColor }: { f: FollowUpWithPerson; groupColor?: string }) {
+  const redirectTo = "/dashboard";
+  const completeAction = completeFollowUp.bind(null, f.id, redirectTo);
+  const deleteAction = deleteFollowUp.bind(null, f.id, redirectTo);
+  const tomorrowAction = snoozeFollowUp.bind(null, f.id, redirectTo, "1d");
+  const sevenDayAction = snoozeFollowUp.bind(null, f.id, redirectTo, "7d");
+  const thirtyDayAction = snoozeFollowUp.bind(null, f.id, redirectTo, "30d");
+
+  return (
+    <li className="px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Link
+            href={`/people/${f.people?.id}`}
+            className="text-sm font-medium hover:underline"
+          >
+            {f.people?.name}
+          </Link>
+          <p className={`text-xs ${groupColor ?? "text-gray-500"}`}>
+            {formatDate(f.due_date)}
+            {f.status === "snoozed" && (
+              <span className="ml-2 text-amber-600">snoozed</span>
+            )}
+          </p>
+          {f.note && (
+            <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
+          )}
+        </div>
+        <CompleteFollowUpButton completeAction={completeAction} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <RescheduleFollowUpButtons
+          tomorrowAction={tomorrowAction}
+          sevenDayAction={sevenDayAction}
+          thirtyDayAction={thirtyDayAction}
+        />
+        <Link
+          href={`/people/${f.people?.id}/follow-ups/${f.id}/edit?returnTo=/dashboard`}
+          className="text-xs text-gray-500 hover:underline"
+        >
+          Edit
+        </Link>
+        <DeleteFollowUpButton deleteAction={deleteAction} />
+      </div>
+    </li>
+  );
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
 
@@ -22,13 +84,14 @@ export default async function DashboardPage() {
       data: { user },
     },
     { overdue, dueToday, upcoming },
+    done,
   ] = await Promise.all([
     supabase.auth.getUser(),
     getDashboardFollowUps(supabase),
+    getDoneFollowUps(supabase),
   ]);
 
-  const hasFollowUps =
-    overdue.length + dueToday.length + upcoming.length > 0;
+  const hasActive = overdue.length + dueToday.length + upcoming.length > 0;
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -52,7 +115,7 @@ export default async function DashboardPage() {
       <section className="mb-8">
         <h2 className="mb-3 text-base font-semibold">Follow-ups</h2>
 
-        {!hasFollowUps && (
+        {!hasActive && (
           <p className="text-sm text-gray-500">
             No overdue or upcoming follow-ups.
           </p>
@@ -65,30 +128,7 @@ export default async function DashboardPage() {
             </p>
             <ul className="divide-y divide-gray-100 rounded border border-red-200">
               {overdue.map((f) => (
-                <li key={f.id} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/people/${f.people?.id}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {f.people?.name}
-                      </Link>
-                      <p className="text-xs text-red-600">
-                        {formatDate(f.due_date)}
-                      </p>
-                      {f.note && (
-                        <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
-                      )}
-                    </div>
-                    <Link
-                      href={`/people/${f.people?.id}`}
-                      className="shrink-0 text-xs text-gray-400 hover:underline"
-                    >
-                      View →
-                    </Link>
-                  </div>
-                </li>
+                <FollowUpCard key={f.id} f={f} groupColor="text-red-600" />
               ))}
             </ul>
           </div>
@@ -101,27 +141,7 @@ export default async function DashboardPage() {
             </p>
             <ul className="divide-y divide-gray-100 rounded border border-gray-200">
               {dueToday.map((f) => (
-                <li key={f.id} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/people/${f.people?.id}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {f.people?.name}
-                      </Link>
-                      {f.note && (
-                        <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
-                      )}
-                    </div>
-                    <Link
-                      href={`/people/${f.people?.id}`}
-                      className="shrink-0 text-xs text-gray-400 hover:underline"
-                    >
-                      View →
-                    </Link>
-                  </div>
-                </li>
+                <FollowUpCard key={f.id} f={f} />
               ))}
             </ul>
           </div>
@@ -134,34 +154,18 @@ export default async function DashboardPage() {
             </p>
             <ul className="divide-y divide-gray-100 rounded border border-gray-200">
               {upcoming.map((f) => (
-                <li key={f.id} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/people/${f.people?.id}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {f.people?.name}
-                      </Link>
-                      <p className="text-xs text-gray-500">
-                        {formatDate(f.due_date)}
-                      </p>
-                      {f.note && (
-                        <p className="mt-0.5 text-xs text-gray-500">{f.note}</p>
-                      )}
-                    </div>
-                    <Link
-                      href={`/people/${f.people?.id}`}
-                      className="shrink-0 text-xs text-gray-400 hover:underline"
-                    >
-                      View →
-                    </Link>
-                  </div>
-                </li>
+                <FollowUpCard key={f.id} f={f} />
               ))}
             </ul>
           </div>
         )}
+
+        <CompletedFollowUpsSection
+          items={done.map((f) => ({
+            ...f,
+            uncompleteAction: uncompleteFollowUp.bind(null, f.id, "/dashboard"),
+          }))}
+        />
       </section>
 
       {/* ── Nav ─────────────────────────────────────────────────────── */}

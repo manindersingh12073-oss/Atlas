@@ -42,6 +42,26 @@ export async function getPersonFollowUps(
 }
 
 /**
+ * Returns completed follow-ups ordered by completion date descending.
+ * Used by the dashboard collapsed section. Includes person name for display.
+ */
+export async function getDoneFollowUps(
+  supabase: SupabaseClient<Database>,
+  limit = 50,
+): Promise<FollowUpWithPerson[]> {
+  const { data } = await supabase
+    .from("follow_ups")
+    .select(
+      "id, person_id, due_date, note, status, completed_at, created_at, people(id, name)",
+    )
+    .eq("status", "done")
+    .order("completed_at", { ascending: false })
+    .limit(limit);
+
+  return (data ?? []) as unknown as FollowUpWithPerson[];
+}
+
+/**
  * Returns pending and snoozed follow-ups due within the next 14 days
  * (including all overdue items), grouped into overdue / dueToday / upcoming.
  *
