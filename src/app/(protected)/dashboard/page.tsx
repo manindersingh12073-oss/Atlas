@@ -4,6 +4,7 @@ import { CompleteFollowUpButton } from "@/components/follow-ups/CompleteFollowUp
 import { CompletedFollowUpsSection } from "@/components/follow-ups/CompletedFollowUpsSection";
 import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButton";
 import { RescheduleFollowUpButtons } from "@/components/follow-ups/RescheduleFollowUpButtons";
+import { CurrentConferenceCard } from "@/components/dashboard/CurrentConferenceCard";
 import { signOut } from "@/lib/auth/actions";
 import {
   completeFollowUp,
@@ -115,43 +116,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Current conference (primary action when active) ─────────── */}
-      {conference && (
-        <section className="mb-8 rounded border border-gray-200 p-4">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">
-            Current conference
-          </p>
-          {conference.eventName ? (
-            <h2 className="text-base font-semibold">{conference.eventName}</h2>
-          ) : (
-            <h2 className="text-base font-semibold text-gray-500">No event selected</h2>
-          )}
-          <p className="mt-0.5 text-sm text-gray-500">
-            Captured today: {conference.capturedCount}
-          </p>
-          {conference.recentCaptures.length > 0 && (
-            <ul className="mt-2 space-y-0.5">
-              {conference.recentCaptures.map((p) => (
-                <li key={p.id} className="flex items-center gap-1.5 text-sm text-gray-600">
-                  <span className="text-xs text-green-500">✓</span>
-                  <Link href={`/people/${p.id}`} className="hover:underline">
-                    {p.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link
-            href={
-              conference.eventId
-                ? `/events/${conference.eventId}/capture`
-                : "/capture"
-            }
-            className="mt-4 block rounded border border-gray-800 bg-gray-800 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-gray-700"
-          >
-            Continue →
-          </Link>
-        </section>
-      )}
+      {conference && <CurrentConferenceCard conference={conference} />}
 
       {/* ── Follow-ups ──────────────────────────────────────────────── */}
       <section className="mb-8">

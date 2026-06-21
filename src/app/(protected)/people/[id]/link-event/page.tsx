@@ -36,21 +36,29 @@ export default async function LinkEventPage({ params }: Props) {
           ← {person.name}
         </Link>
       </div>
-      <h1 className="mb-6 text-xl font-semibold">Link existing event</h1>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold">Link existing event</h1>
+        <Link
+          href={`/people/${person.id}/add-event`}
+          className="shrink-0 text-sm text-gray-500 hover:underline"
+        >
+          Create new event →
+        </Link>
+      </div>
 
       {allEvents.length === 0 ? (
         <p className="text-sm text-gray-500">
           You have no events yet.{" "}
-          <Link
-            href={`/people/${person.id}/add-event`}
-            className="underline"
-          >
+          <Link href={`/people/${person.id}/add-event`} className="underline">
             Create a new event instead.
           </Link>
         </p>
       ) : availableEvents.length === 0 ? (
         <p className="text-sm text-gray-500">
-          All your events are already linked to this person.
+          All your events are already linked to this person.{" "}
+          <Link href={`/people/${person.id}/add-event`} className="underline">
+            Create a new event instead.
+          </Link>
         </p>
       ) : (
         <LinkEventForm availableEvents={availableEvents} personId={person.id} />
