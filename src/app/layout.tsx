@@ -27,7 +27,6 @@ export default function RootLayout({
     // before hydration, so server/client HTML will differ. This suppresses the warning.
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-screen bg-white text-gray-900 antialiased dark:bg-[#0f1117] dark:text-[#e6edf3]">

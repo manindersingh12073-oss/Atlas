@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -11,19 +11,16 @@ const OPTIONS: { value: Theme; label: string }[] = [
 ];
 
 /**
- * Persists the chosen theme in localStorage under "atlas_theme".
- * New themes can be added by extending the Theme type and OPTIONS array;
- * no other files need to change.
+ * Reads the stored theme once via a lazy initializer — no effect needed.
+ * The lazy function runs once at mount on the client; `window` is always
+ * available at that point in a Client Component.
  */
 export function ThemeSelector() {
-  const [theme, setTheme] = useState<Theme>("system");
-
-  useEffect(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "system";
     const stored = localStorage.getItem("atlas_theme") as Theme | null;
-    if (stored && OPTIONS.some((o) => o.value === stored)) {
-      setTheme(stored);
-    }
-  }, []);
+    return stored && OPTIONS.some((o) => o.value === stored) ? stored : "system";
+  });
 
   function applyTheme(t: Theme) {
     setTheme(t);

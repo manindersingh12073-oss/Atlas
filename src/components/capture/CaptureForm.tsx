@@ -77,12 +77,33 @@ export function CaptureForm({
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  // ── Form state ───────────────────────────────────────────────────────────
+  // ── Lazy localStorage reader ─────────────────────────────────────────────
+  // Called inside each lazy state initializer below — never in an effect.
+  function readCapturePrefs(): {
+    eventId?: string;
+    followUpOption?: FollowUpOption;
+    defaultTagIds?: string[];
+  } | null {
+    if (typeof window === "undefined") return null;
+    try {
+      const s = localStorage.getItem("atlas_capture_prefs");
+      return s ? JSON.parse(s) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ── Form state (localStorage initialised lazily, no effect needed) ───────
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
-  const [tagIds, setTagIds] = useState<string[]>([]);
-  const [eventId, setEventId] = useState<string | null>(defaultEventId);
-  const [followUpOption, setFollowUpOption] = useState<FollowUpOption>(null);
+  const [tagIds, setTagIds] = useState<string[]>(() => readCapturePrefs()?.defaultTagIds ?? []);
+  const [eventId, setEventId] = useState<string | null>(() => {
+    if (defaultEventId) return defaultEventId;
+    return readCapturePrefs()?.eventId ?? null;
+  });
+  const [followUpOption, setFollowUpOption] = useState<FollowUpOption>(
+    () => readCapturePrefs()?.followUpOption ?? null,
+  );
   const [metPeople, setMetPeople] = useState<MetPerson[]>([]);
 
   // ── UI state ─────────────────────────────────────────────────────────────
@@ -96,26 +117,9 @@ export function CaptureForm({
   const nameRef = useRef<HTMLInputElement>(null);
   const dupeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // ── localStorage — preferences only ──────────────────────────────────────
+  // ── Focus on mount (DOM interaction — valid external system sync) ─────────
   useEffect(() => {
-    const stored = localStorage.getItem("atlas_capture_prefs");
-    if (stored) {
-      try {
-        const prefs = JSON.parse(stored) as {
-          eventId?: string;
-          followUpOption?: FollowUpOption;
-          defaultTagIds?: string[];
-        };
-        if (!defaultEventId) setEventId(prefs.eventId ?? null);
-        setFollowUpOption(prefs.followUpOption ?? null);
-        setTagIds(prefs.defaultTagIds ?? []);
-      } catch {
-        // ignore malformed stored state
-      }
-    }
-    // Focus name on mount
     nameRef.current?.focus();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -133,9 +137,13 @@ export function CaptureForm({
   }, [lastSaved]);
 
   // ── Duplicate detection ───────────────────────────────────────────────────
+  // `duplicates` is the raw async result. `visibleDuplicates` is derived:
+  // when name is too short we show nothing without a synchronous setState.
+  const visibleDuplicates = name.length >= 3 ? duplicates : [];
+
   useEffect(() => {
     clearTimeout(dupeTimerRef.current);
-    if (name.length < 3) { setDuplicates([]); return; }
+    if (name.length < 3) return; // visibleDuplicates is already [] when name < 3
     dupeTimerRef.current = setTimeout(async () => {
       const supabase = createClient();
       const escaped = name.replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -230,7 +238,7 @@ export function CaptureForm({
   }
 
   async function handleUseExisting(existingId: string) {
-    const existing = duplicates.find((d) => d.id === existingId);
+    const existing = visibleDuplicates.find((d) => d.id === existingId);
     if (!existing || pending) return;
     setPending(true);
     setError(null);
@@ -345,10 +353,10 @@ export function CaptureForm({
         </div>
 
         {/* ── Duplicate panel ──────────────────────────────────────────── */}
-        {duplicates.length > 0 && (
+        {visibleDuplicates.length > 0 && (
           <div className="mb-3 rounded border border-amber-200 bg-amber-50 p-3">
             <p className="mb-2 text-xs font-medium text-amber-700">Possible existing person</p>
-            {duplicates.slice(0, 1).map((d) => (
+            {visibleDuplicates.slice(0, 1).map((d) => (
               <div key={d.id}>
                 <p className="text-sm font-medium">{d.name}</p>
                 {d.company && <p className="text-xs text-gray-500">{d.company}</p>}

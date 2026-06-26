@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import Link from "next/link";
 
@@ -14,21 +14,18 @@ export function CurrentConferenceCard({
 }: {
   conference: ConferenceStatus;
 }) {
-  const [hidden, setHidden] = useState(false);
-
-  // Hide the card if the user already ended the conference today.
-  useEffect(() => {
+  // Lazy initializer reads localStorage once at mount — no effect needed.
+  const [hidden, setHidden] = useState(() => {
+    if (typeof window === "undefined") return false;
     const today = new Date().toISOString().split("T")[0];
-    if (localStorage.getItem(ENDED_KEY) === today) setHidden(true);
-  }, []);
+    return localStorage.getItem(ENDED_KEY) === today;
+  });
 
   if (hidden) return null;
 
   function handleEndConference() {
     const today = new Date().toISOString().split("T")[0];
-    // Mark conference as ended for today so the card stays hidden on refresh.
     localStorage.setItem(ENDED_KEY, today);
-    // Clear capture preferences — next session starts fresh.
     localStorage.removeItem(PREFS_KEY);
     setHidden(true);
   }

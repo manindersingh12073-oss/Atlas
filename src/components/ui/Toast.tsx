@@ -1,54 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-const MESSAGES: Record<string, { text: string; type: "success" | "info" }> = {
-  "person-saved":    { text: "✓ Person saved",            type: "success" },
-  "event-saved":     { text: "✓ Event saved",             type: "success" },
-  "follow-up-saved": { text: "✓ Follow-up saved",         type: "success" },
-  "deleted":         { text: "✓ Deleted",                 type: "success" },
-  "restored":        { text: "✓ Data restored",           type: "success" },
+const MESSAGES: Record<string, string> = {
+  "person-saved":    "✓ Person saved",
+  "event-saved":     "✓ Event saved",
+  "follow-up-saved": "✓ Follow-up saved",
+  "deleted":         "✓ Deleted",
+  "restored":        "✓ Data restored",
 };
 
 /**
- * Reads a `?toast=X` URL param on mount, shows a brief notification, then
- * removes the param from the URL. Requires a Suspense boundary at the call site.
+ * Reads the `?toast=X` URL param as the single source of truth — no state needed.
+ * The message is visible while the param exists; an effect cleans up the URL
+ * after the display duration by calling router.replace (external system sync).
+ * Requires a Suspense boundary at the call site (uses useSearchParams).
  */
 export function Toast() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [entry, setEntry] = useState<{ text: string; type: "success" | "info" } | null>(null);
+
+  const key = searchParams.get("toast");
+  const message = key ? MESSAGES[key] : null;
 
   useEffect(() => {
-    const key = searchParams.get("toast");
-    const msg = key ? MESSAGES[key] : undefined;
-    if (!msg) return;
+    if (!message) return;
 
-    setEntry(msg);
-
-    // Strip the param from the URL without re-triggering a navigation.
+    // Strip the param after the display duration. router.replace is external
+    // system synchronisation — calling it in an effect is correct.
     const next = new URLSearchParams(searchParams.toString());
     next.delete("toast");
-    const qs = next.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    const cleanUrl = next.toString()
+      ? `${pathname}?${next.toString()}`
+      : pathname;
 
-    const t = setTimeout(() => setEntry(null), 3500);
+    const t = setTimeout(() => {
+      router.replace(cleanUrl, { scroll: false });
+    }, 3500);
+
     return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [message, pathname, router, searchParams]);
 
-  if (!entry) return null;
+  if (!message) return null;
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-green-200 bg-white px-4 py-2.5 text-sm font-medium text-green-800 shadow-lg duration-200 dark:border-green-800 dark:bg-[#0d2015] dark:text-green-300"
+      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg border border-green-200 bg-white px-4 py-2.5 text-sm font-medium text-green-800 shadow-lg dark:border-green-800 dark:bg-[#0d2015] dark:text-green-300"
     >
-      {entry.text}
+      {message}
     </div>
   );
 }

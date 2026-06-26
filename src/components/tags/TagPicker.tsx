@@ -94,11 +94,6 @@ export function TagPicker({
     }
   }
 
-  // Reset focused index when the list changes (query changes).
-  useEffect(() => {
-    setFocusedIndex(-1);
-  }, [query]);
-
   useEffect(() => {
     if (!open) return;
     function onMouseDown(e: MouseEvent) {
@@ -129,7 +124,7 @@ export function TagPicker({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setFocusedIndex(-1); }}
             onKeyDown={handleKeyDown}
             placeholder="Search or create…"
             className="w-full border-b border-gray-100 px-3 py-2 text-xs outline-none"

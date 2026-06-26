@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import Link from "next/link";
 
@@ -25,15 +25,13 @@ export function OnboardingChecklist({
   followUpsEver: number;
   relationshipsCount: number;
 }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    // Only show if not dismissed and user hasn't built up substantial data.
-    const dismissed = localStorage.getItem(DISMISSED_KEY) === "1";
-    if (!dismissed && peopleCount < 20) {
-      setVisible(true);
-    }
-  }, [peopleCount]);
+  // Lazy initializer reads localStorage once at mount — no effect needed.
+  // Dismissed state is the only thing read from localStorage; visibility
+  // is then derived from dismissed + the count props.
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(DISMISSED_KEY) === "1";
+  });
 
   const items: Item[] = [
     {
@@ -76,12 +74,15 @@ export function OnboardingChecklist({
   const doneCount = items.filter((i) => i.done).length;
   const allDone = doneCount === items.length;
 
-  function dismiss() {
-    localStorage.setItem(DISMISSED_KEY, "1");
-    setVisible(false);
-  }
+  // Derive visibility: hide when dismissed, all done, or user has substantial data.
+  const isVisible = !dismissed && !allDone && peopleCount < 20;
 
-  if (!visible || allDone) return null;
+  if (!isVisible) return null;
+
+  function handleDismiss() {
+    localStorage.setItem(DISMISSED_KEY, "1");
+    setDismissed(true);
+  }
 
   return (
     <section className="mb-8 rounded border border-blue-200 bg-blue-50 p-4 dark:border-[#1a3a52] dark:bg-[#0d1f2d]">
@@ -96,7 +97,7 @@ export function OnboardingChecklist({
         </div>
         <button
           type="button"
-          onClick={dismiss}
+          onClick={handleDismiss}
           className="shrink-0 text-xs text-blue-400 hover:text-blue-600 dark:text-blue-600 dark:hover:text-blue-400"
         >
           Dismiss
