@@ -43,7 +43,7 @@ export async function createPerson(
   if (error || !data) return { error: error?.message ?? "Failed to create person." };
 
   // redirect() must be called outside try/catch — it throws NEXT_REDIRECT internally.
-  redirect(`/people/${data.id}`);
+  redirect(`/people/${data.id}?toast=person-saved`);
 }
 
 export async function updatePerson(
@@ -76,7 +76,7 @@ export async function updatePerson(
 
   if (error) return { error: error.message };
 
-  redirect(`/people/${id}`);
+  redirect(`/people/${id}?toast=person-saved`);
 }
 
 export async function deletePerson(id: string): Promise<void> {
@@ -88,5 +88,5 @@ export async function deletePerson(id: string): Promise<void> {
 
   await supabase.from("people").delete().eq("id", id).eq("owner_id", user.id);
 
-  redirect("/people");
+  redirect("/people?toast=deleted");
 }

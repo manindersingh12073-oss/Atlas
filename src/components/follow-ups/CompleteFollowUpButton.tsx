@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 
+import { Spinner } from "@/components/ui/Spinner";
+
 export function CompleteFollowUpButton({
   completeAction,
 }: {
@@ -16,7 +18,14 @@ export function CompleteFollowUpButton({
       disabled={pending}
       className="text-xs text-green-600 hover:underline disabled:opacity-50"
     >
-      {pending ? "Completing…" : "Complete"}
+      {pending ? (
+        <span className="flex items-center gap-1">
+          <Spinner className="h-3 w-3" />
+          Completing…
+        </span>
+      ) : (
+        "Complete"
+      )}
     </button>
   );
 }

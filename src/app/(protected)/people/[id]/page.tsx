@@ -126,7 +126,7 @@ export default async function PersonDetailPage({ params }: Props) {
   ].filter((f) => f.value);
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
+    <main className="mx-auto max-w-[62rem] p-6">
       <div className="mb-4">
         <Link href="/people" className="text-sm text-gray-500 hover:underline">
           ← People
@@ -369,6 +369,12 @@ export default async function PersonDetailPage({ params }: Props) {
       {/* ── Relationships section ──────────────────────────────────────── */}
       <section className="mt-6">
         <h2 className="mb-3 text-base font-semibold">Relationships</h2>
+        {relationships.length === 0 && (
+          <p className="mb-3 text-xs text-gray-400">
+            No relationships recorded. Use the picker below to connect{" "}
+            <span className="font-medium">{person.name}</span> to others in your network.
+          </p>
+        )}
         {relationships.length > 0 && (
           <ul className="mb-3 divide-y divide-gray-100 rounded border border-gray-200">
             {relationships.map((rel) => {

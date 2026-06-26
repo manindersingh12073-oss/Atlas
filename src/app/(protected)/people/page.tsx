@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
+
 import { PeopleSearchInput } from "@/components/people/PeopleSearchInput";
 import { SortSelect } from "@/components/SortSelect";
 import { TagChip } from "@/components/tags/TagChip";
@@ -67,13 +69,7 @@ export default async function PeoplePage({ searchParams }: Props) {
     hasTagFilter ? `/people?tags=${selectedTagIds.join(",")}` : "/people";
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <div className="mb-4">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:underline">
-          ← Dashboard
-        </Link>
-      </div>
-
+    <main className="mx-auto max-w-[62rem] p-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">People</h1>
         <Link
@@ -152,7 +148,7 @@ export default async function PeoplePage({ searchParams }: Props) {
             const ed = eventDataMap.get(person.id);
             const personTags = personTagsMap.get(person.id) ?? [];
             return (
-              <li key={person.id} className="px-4 py-3 hover:bg-gray-50">
+              <li key={person.id} className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#1c2230]">
                 {/* Top row: person info + arrow */}
                 <div className="flex items-start justify-between gap-4">
                   <Link
@@ -212,41 +208,36 @@ export default async function PeoplePage({ searchParams }: Props) {
           })}
         </ul>
       ) : hasQuery || hasTagFilter ? (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-500">
-            No people found
-            {hasQuery && (
-              <>
-                {" "}matching{" "}
-                <span className="font-medium">&ldquo;{query}&rdquo;</span>
-              </>
-            )}
-            {hasTagFilter && !hasQuery && " with the selected tags"}.
-          </p>
+        <div>
+          <EmptyState
+            icon="🔍"
+            title={hasQuery ? `No results for "${query}"` : "No people match the selected tags"}
+            description={
+              hasQuery
+                ? "Try different keywords, or add this person to your network."
+                : "Try adjusting your tag filters."
+            }
+            action={
+              hasQuery
+                ? { label: `Add "${query}"`, href: `/people/new?name=${encodeURIComponent(query)}` }
+                : undefined
+            }
+          />
           {hasQuery && (
-            <div className="flex items-center gap-3">
-              <Link
-                href={`/people/new?name=${encodeURIComponent(query)}`}
-                className="rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
-              >
-                Add &ldquo;{query}&rdquo;
-              </Link>
-              <Link
-                href={clearSearchHref}
-                className="text-sm text-gray-500 hover:underline"
-              >
+            <div className="mt-2 text-center">
+              <Link href={clearSearchHref} className="text-xs text-gray-500 hover:underline">
                 Clear search
               </Link>
             </div>
           )}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">
-          No people yet.{" "}
-          <Link href="/people/new" className="underline">
-            Add your first person.
-          </Link>
-        </p>
+        <EmptyState
+          icon="👤"
+          title="No people yet"
+          description="Start building your network. Add people you meet at events, online, or anywhere else."
+          action={{ label: "Add your first person", href: "/people/new" }}
+        />
       )}
     </main>
   );

@@ -5,7 +5,7 @@ import { CompletedFollowUpsSection } from "@/components/follow-ups/CompletedFoll
 import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButton";
 import { RescheduleFollowUpButtons } from "@/components/follow-ups/RescheduleFollowUpButtons";
 import { CurrentConferenceCard } from "@/components/dashboard/CurrentConferenceCard";
-import { signOut } from "@/lib/auth/actions";
+import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import {
   completeFollowUp,
   deleteFollowUp,
@@ -18,9 +18,11 @@ import {
 } from "@/lib/follow-ups/queries";
 import type { FollowUpWithPerson } from "@/lib/follow-ups/queries";
 import { getCurrentConference } from "@/lib/capture/queries";
+import { getDashboardData } from "@/lib/dashboard/queries";
 import { createClient } from "@/lib/supabase/server";
 
-// Parses YYYY-MM-DD as a local date for display — avoids UTC day-shift.
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
@@ -28,6 +30,34 @@ function formatDate(dateStr: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded border border-gray-200 p-4">
+      <p className="text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-0.5 text-xs text-gray-500">{label}</p>
+    </div>
+  );
+}
+
+function InsightCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded border border-gray-200 p-4">
+      <p className="text-xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-0.5 text-xs text-gray-500">{label}</p>
+    </div>
+  );
 }
 
 function FollowUpCard({ f, groupColor }: { f: FollowUpWithPerson; groupColor?: string }) {
@@ -78,6 +108,8 @@ function FollowUpCard({ f, groupColor }: { f: FollowUpWithPerson; groupColor?: s
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default async function DashboardPage() {
   const supabase = await createClient();
 
@@ -85,11 +117,13 @@ export default async function DashboardPage() {
     {
       data: { user },
     },
+    { stats, insights, recentPeople },
     { overdue, dueToday, upcoming },
     done,
     conference,
   ] = await Promise.all([
     supabase.auth.getUser(),
+    getDashboardData(supabase),
     getDashboardFollowUps(supabase),
     getDoneFollowUps(supabase),
     getCurrentConference(supabase),
@@ -98,25 +132,110 @@ export default async function DashboardPage() {
   const hasActive = overdue.length + dueToday.length + upcoming.length > 0;
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Atlas</h1>
-          <p className="mt-0.5 text-sm text-gray-500">{user?.email}</p>
+    <main className="mx-auto max-w-[62rem] p-6">
+
+      {/* ── Network stats ────────────────────────────────────────────── */}
+      <section className="mb-8">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="People" value={stats.peopleCount} />
+          <StatCard label="Events" value={stats.eventsCount} />
+          <StatCard label="Relationships" value={stats.relationshipsCount} />
+          <StatCard label="Pending follow-ups" value={stats.pendingFollowUpsCount} />
         </div>
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="text-sm text-gray-400 hover:underline"
-          >
-            Sign out
-          </button>
-        </form>
-      </div>
+      </section>
+
+      {/* ── Onboarding checklist (first-time users) ─────────────────── */}
+      <OnboardingChecklist
+        peopleCount={stats.peopleCount}
+        eventsCount={stats.eventsCount}
+        followUpsEver={stats.pendingFollowUpsCount + insights.completedFollowUpsCount}
+        relationshipsCount={stats.relationshipsCount}
+      />
 
       {/* ── Current conference (primary action when active) ─────────── */}
       {conference && <CurrentConferenceCard conference={conference} />}
+
+      {/* ── Network activity ─────────────────────────────────────────── */}
+      <section className="mb-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold">Network Activity</h2>
+          <Link href="/people" className="text-xs text-gray-500 hover:underline">
+            View all →
+          </Link>
+        </div>
+
+        {recentPeople.length > 0 ? (
+          <ul className="divide-y divide-gray-100 rounded border border-gray-200">
+            {recentPeople.map((person) => (
+              <li key={person.id}>
+                <Link
+                  href={`/people/${person.id}`}
+                  className="flex items-start justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#1c2230]"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{person.name}</p>
+                    {person.company && (
+                      <p className="text-xs text-gray-500">{person.company}</p>
+                    )}
+                  </div>
+                  <p className="shrink-0 pl-4 text-xs text-gray-400">
+                    {formatTimestamp(person.created_at)}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">
+            No people added yet.{" "}
+            <Link href="/people/new" className="underline">
+              Add your first person.
+            </Link>
+          </p>
+        )}
+      </section>
+
+      {/* ── Network insights ─────────────────────────────────────────── */}
+      <section className="mb-8">
+        <h2 className="mb-3 text-base font-semibold">Network Insights</h2>
+
+        <div className="mb-3 grid grid-cols-3 gap-3">
+          <InsightCard
+            label="Unique companies"
+            value={insights.uniqueCompaniesCount}
+          />
+          <InsightCard label="Tags" value={insights.totalTagsCount} />
+          <InsightCard
+            label="Completed follow-ups"
+            value={insights.completedFollowUpsCount}
+          />
+        </div>
+
+        <ul className="divide-y divide-gray-100 rounded border border-gray-200">
+          {[
+            { label: "Most common tag", value: insights.mostCommonTag },
+            {
+              label: "Most represented company",
+              value: insights.mostRepresentedCompany,
+            },
+            {
+              label: "Avg. people per event",
+              value:
+                insights.avgPeoplePerEvent != null
+                  ? insights.avgPeoplePerEvent.toFixed(1)
+                  : null,
+            },
+          ].map(({ label, value }) => (
+            <li
+              key={label}
+              className="flex items-center justify-between px-4 py-3"
+            >
+              <p className="text-sm text-gray-500">{label}</p>
+              <p className="text-sm font-medium">{value ?? "—"}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {/* ── Follow-ups ──────────────────────────────────────────────── */}
       <section className="mb-8">
@@ -124,7 +243,12 @@ export default async function DashboardPage() {
 
         {!hasActive && (
           <p className="text-sm text-gray-500">
-            No overdue or upcoming follow-ups.
+            No overdue or upcoming follow-ups.{" "}
+            {stats.peopleCount > 0 && (
+              <Link href="/people" className="underline">
+                Open a contact to add one.
+              </Link>
+            )}
           </p>
         )}
 
@@ -175,27 +299,6 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {/* ── Nav ─────────────────────────────────────────────────────── */}
-      <div className="flex gap-3">
-        <Link
-          href="/people"
-          className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-        >
-          People →
-        </Link>
-        <Link
-          href="/events"
-          className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-        >
-          Events →
-        </Link>
-        <Link
-          href="/capture"
-          className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-        >
-          Capture →
-        </Link>
-      </div>
     </main>
   );
 }

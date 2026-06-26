@@ -72,7 +72,7 @@ export async function createFollowUp(
 
   if (error) return { error: error.message };
 
-  redirect(`/people/${personId}`);
+  redirect(`/people/${personId}?toast=follow-up-saved`);
 }
 
 export async function updateFollowUp(

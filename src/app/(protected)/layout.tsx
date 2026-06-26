@@ -1,12 +1,12 @@
+import { Suspense } from "react";
+
 import { redirect } from "next/navigation";
 
+import { KeyboardShortcuts } from "@/components/layout/KeyboardShortcuts";
+import { TopNav } from "@/components/layout/TopNav";
+import { Toast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Server-side guard for all authenticated routes. This is the authoritative
- * check — the proxy redirect is UX only. Anything rendered under (protected)
- * can assume a valid user.
- */
 export default async function ProtectedLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -17,5 +17,15 @@ export default async function ProtectedLayout({
 
   if (!user) redirect("/login");
 
-  return <>{children}</>;
+  return (
+    <div className="flex min-h-screen flex-col">
+      <TopNav userEmail={user.email ?? ""} />
+      <div className="flex-1">{children}</div>
+      <KeyboardShortcuts />
+      {/* Toast requires Suspense because it reads useSearchParams */}
+      <Suspense fallback={null}>
+        <Toast />
+      </Suspense>
+    </div>
+  );
 }

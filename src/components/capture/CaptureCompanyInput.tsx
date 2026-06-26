@@ -9,6 +9,7 @@ type Props = {
   allCompanies: string[];
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  disabled?: boolean;
 };
 
 export function CaptureCompanyInput({
@@ -18,6 +19,7 @@ export function CaptureCompanyInput({
   allCompanies,
   onKeyDown,
   inputRef: externalRef,
+  disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,11 +65,12 @@ export function CaptureCompanyInput({
           onChange(e.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => { if (!disabled) setOpen(true); }}
         onKeyDown={onKeyDown}
         placeholder="Company"
         autoComplete="off"
-        className="block w-full rounded border border-gray-300 px-3 py-2.5 text-sm focus:border-gray-500 focus:outline-none"
+        disabled={disabled}
+        className="block w-full rounded border border-gray-300 px-3 py-2.5 text-sm focus:border-gray-500 focus:outline-none disabled:opacity-50"
       />
 
       {showDropdown && (

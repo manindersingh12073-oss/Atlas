@@ -65,7 +65,7 @@ export default async function EventDetailPage({ params }: Props) {
   const deleteEventWithId = deleteEvent.bind(null, event.id);
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
+    <main className="mx-auto max-w-[62rem] p-6">
       <div className="mb-4">
         <Link href="/events" className="text-sm text-gray-500 hover:underline">
           ← Events

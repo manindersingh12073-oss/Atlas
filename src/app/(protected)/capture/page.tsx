@@ -58,15 +58,15 @@ export default async function CapturePage({ searchParams }: Props) {
   }
 
   return (
-    <main className="mx-auto max-w-lg">
-      <div className="flex items-center justify-between px-4 pt-4 pb-1">
-        <Link
-          href={returnTo ?? "/dashboard"}
-          className="text-sm text-gray-500 hover:underline"
-        >
-          ← {returnTo ? "Back" : "Dashboard"}
-        </Link>
-      </div>
+    <main className="mx-auto max-w-[62rem]">
+      {/* Show breadcrumb only in relationship context (returnTo = originating person page) */}
+      {returnTo && (
+        <div className="px-4 pt-4 pb-1">
+          <Link href={returnTo} className="text-sm text-gray-500 hover:underline">
+            ← Back
+          </Link>
+        </div>
+      )}
       <CaptureForm
         capturedToday={capturedToday}
         allTags={allTags}

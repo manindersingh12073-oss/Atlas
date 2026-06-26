@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { captureAndSave, linkExistingInCapture, undoCapture } from "@/lib/capture/actions";
 import { addRelationship } from "@/lib/relationships/actions";
+import { Spinner } from "@/components/ui/Spinner";
 import type { RelationshipType } from "@/lib/relationships/queries";
 import type { TagWithCount } from "@/lib/tags/queries";
 import { CaptureCompanyInput } from "@/components/capture/CaptureCompanyInput";
@@ -338,7 +339,8 @@ export function CaptureForm({
             onKeyDown={handlePrimaryInputKeyDown}
             placeholder="Full name"
             autoComplete="off"
-            className={`${inputClass} text-base`}
+            disabled={pending}
+            className={`${inputClass} text-base disabled:opacity-50`}
           />
         </div>
 
@@ -381,6 +383,7 @@ export function CaptureForm({
             recentCompanies={recentCompanies}
             allCompanies={allCompanies}
             onKeyDown={handlePrimaryInputKeyDown}
+            disabled={pending}
           />
         </div>
 
@@ -493,7 +496,14 @@ export function CaptureForm({
           disabled={!name.trim() || pending}
           className="w-full rounded border border-gray-800 bg-gray-800 py-3 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-40"
         >
-          {pending ? "Saving…" : relationshipTarget ? "Save & Return" : "Save & Next"}
+          {pending ? (
+            <span className="flex items-center justify-center gap-1.5">
+              <Spinner className="h-4 w-4" />
+              Saving…
+            </span>
+          ) : (
+            relationshipTarget ? "Save & Return" : "Save & Next"
+          )}
         </button>
         <button
           type="button"

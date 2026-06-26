@@ -28,7 +28,7 @@ export default async function EventCapturePage({ params }: Props) {
   const event = eventResult.data;
 
   return (
-    <main className="mx-auto max-w-lg">
+    <main className="mx-auto max-w-[62rem]">
       <div className="flex items-center justify-between px-4 pt-4 pb-1">
         <Link
           href={`/events/${event.id}`}

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
+
 import { SearchInput } from "@/components/SearchInput";
 import { SortSelect } from "@/components/SortSelect";
 import {
@@ -34,13 +36,7 @@ export default async function EventsPage({ searchParams }: Props) {
   const events = await searchEvents(supabase, query, sort);
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <div className="mb-4">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:underline">
-          ← Dashboard
-        </Link>
-      </div>
-
+    <main className="mx-auto max-w-[62rem] p-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Events</h1>
         <Link
@@ -102,7 +98,7 @@ export default async function EventsPage({ searchParams }: Props) {
             <li key={event.id}>
               <Link
                 href={`/events/${event.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
+                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#1c2230]"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{event.name}</p>
@@ -131,33 +127,26 @@ export default async function EventsPage({ searchParams }: Props) {
           ))}
         </ul>
       ) : hasQuery ? (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-500">
-            No events found matching{" "}
-            <span className="font-medium">&ldquo;{query}&rdquo;</span>.
-          </p>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/events/new"
-              className="rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Add event
-            </Link>
-            <Link
-              href="/events"
-              className="text-sm text-gray-500 hover:underline"
-            >
+        <div>
+          <EmptyState
+            icon="🔍"
+            title={`No results for "${query}"`}
+            description="Try different keywords, or add a new event."
+            action={{ label: "Add event", href: "/events/new" }}
+          />
+          <div className="mt-2 text-center">
+            <Link href="/events" className="text-xs text-gray-500 hover:underline">
               Clear search
             </Link>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-500">
-          No events yet.{" "}
-          <Link href="/events/new" className="underline">
-            Add your first event.
-          </Link>
-        </p>
+        <EmptyState
+          icon="📅"
+          title="No events yet"
+          description="Record events you attend to track who you meet and build context around each relationship."
+          action={{ label: "Add your first event", href: "/events/new" }}
+        />
       )}
     </main>
   );

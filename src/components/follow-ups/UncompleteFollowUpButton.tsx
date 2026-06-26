@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 
+import { Spinner } from "@/components/ui/Spinner";
+
 export function UncompleteFollowUpButton({
   uncompleteAction,
 }: {
@@ -16,7 +18,14 @@ export function UncompleteFollowUpButton({
       disabled={pending}
       className="text-xs text-gray-400 hover:underline disabled:opacity-50"
     >
-      {pending ? "…" : "Uncomplete"}
+      {pending ? (
+        <span className="flex items-center gap-1">
+          <Spinner className="h-3 w-3" />
+          Restoring…
+        </span>
+      ) : (
+        "Uncomplete"
+      )}
     </button>
   );
 }

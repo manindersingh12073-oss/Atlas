@@ -59,6 +59,7 @@ export function SearchInput({
       onChange={handleChange}
       placeholder={placeholder}
       autoComplete="off"
+      data-shortcut-search
       className={`block w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none${isPending ? " opacity-60" : ""}`}
     />
   );

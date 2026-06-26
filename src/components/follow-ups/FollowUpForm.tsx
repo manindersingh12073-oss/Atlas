@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { Spinner } from "@/components/ui/Spinner";
 import type { ActionState } from "@/lib/follow-ups/actions";
 
 type Props = {
@@ -69,7 +70,14 @@ export function FollowUpForm({
         disabled={pending}
         className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
       >
-        {pending ? "Saving…" : submitLabel}
+        {pending ? (
+          <span className="flex items-center gap-1.5">
+            <Spinner className="h-3 w-3" />
+            Saving…
+          </span>
+        ) : (
+          submitLabel
+        )}
       </button>
     </form>
   );

@@ -38,7 +38,7 @@ export async function createEvent(
 
   if (error || !data) return { error: error?.message ?? "Failed to create event." };
 
-  redirect(`/events/${data.id}`);
+  redirect(`/events/${data.id}?toast=event-saved`);
 }
 
 export async function updateEvent(
@@ -68,7 +68,7 @@ export async function updateEvent(
 
   if (error) return { error: error.message };
 
-  redirect(`/events/${id}`);
+  redirect(`/events/${id}?toast=event-saved`);
 }
 
 export async function deleteEvent(id: string): Promise<void> {
@@ -80,5 +80,5 @@ export async function deleteEvent(id: string): Promise<void> {
 
   await supabase.from("events").delete().eq("id", id).eq("owner_id", user.id);
 
-  redirect("/events");
+  redirect("/events?toast=deleted");
 }

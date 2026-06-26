@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 
+import { Spinner } from "@/components/ui/Spinner";
+
 export function DeleteFollowUpButton({
   deleteAction,
 }: {
@@ -21,7 +23,14 @@ export function DeleteFollowUpButton({
       disabled={pending}
       className="text-xs text-red-500 hover:underline disabled:opacity-50"
     >
-      {pending ? "Deleting…" : "Delete"}
+      {pending ? (
+        <span className="flex items-center gap-1">
+          <Spinner className="h-3 w-3" />
+          Deleting…
+        </span>
+      ) : (
+        "Delete"
+      )}
     </button>
   );
 }
