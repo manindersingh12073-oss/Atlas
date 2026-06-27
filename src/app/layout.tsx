@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
+
 
 export const metadata: Metadata = {
   title: "Atlas",
@@ -31,7 +33,8 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-white text-gray-900 antialiased dark:bg-[#0f1117] dark:text-[#e6edf3]">
         <ThemeProvider>{children}</ThemeProvider>
-      </body>
+      <Analytics />
+    </body>
     </html>
   );
 }
