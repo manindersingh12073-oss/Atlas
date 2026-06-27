@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ExportButtons } from "@/components/export/ExportButtons";
 import { RestoreSection } from "@/components/settings/RestoreSection";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
+import { FeedbackButton } from "@/components/ui/FeedbackButton";
 import { ATLAS_VERSION } from "@/lib/export/formatters";
 
 export default function SettingsPage() {
@@ -68,6 +69,24 @@ export default function SettingsPage() {
         </h2>
 
         <div className="space-y-8">
+          {/* Beta notice */}
+          <div className="rounded border border-amber-200 bg-amber-50 p-4 dark:border-[#4d3b18] dark:bg-[#2a2217]">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+              Atlas Beta
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-400">
+              Thank you for testing Atlas. Atlas is currently in active
+              development and your feedback is incredibly valuable.
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-400">
+              Please report bugs, confusing workflows, missing features or
+              anything that could make Atlas better.
+            </p>
+            <div className="mt-3">
+              <FeedbackButton variant="inline" />
+            </div>
+          </div>
+
           {/* What is Atlas */}
           <div>
             <p className="mb-2 text-base font-medium">What is Atlas?</p>
@@ -137,8 +156,23 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {/* Version */}
-          <p className="text-sm text-gray-400">Version {ATLAS_VERSION}</p>
+          {/* Feedback */}
+          <div>
+            <p className="mb-1 text-base font-medium">Feedback</p>
+            <p className="mb-3 text-sm leading-relaxed text-gray-600">
+              Share your experience, report bugs or suggest improvements. Every
+              piece of feedback helps make Atlas better.
+            </p>
+            <FeedbackButton variant="inline" />
+          </div>
+
+          {/* Credit + version */}
+          <div className="border-t border-gray-100 pt-4 dark:border-[#30363d]">
+            <p className="text-sm text-gray-500">Built by Maninder.</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Version {ATLAS_VERSION} Beta
+            </p>
+          </div>
         </div>
       </section>
     </main>

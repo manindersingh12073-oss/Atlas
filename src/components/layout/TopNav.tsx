@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { signOut } from "@/lib/auth/actions";
+import { FeedbackButton } from "@/components/ui/FeedbackButton";
 
 // ── Nav link with active-state highlighting ────────────────────────────────
 
@@ -92,6 +93,8 @@ export function TopNav({ userEmail }: { userEmail: string }) {
             ?
           </button>
 
+          <FeedbackButton variant="nav" />
+
           <NavLink href="/settings">Settings</NavLink>
 
           <span className="text-xs text-gray-300 dark:text-[#3d444e]">
@@ -142,6 +145,9 @@ export function TopNav({ userEmail }: { userEmail: string }) {
             </NavLink>
           </nav>
           <div className="mt-3 border-t border-gray-100 pt-3 dark:border-[#30363d]">
+            <div className="mb-3">
+              <FeedbackButton variant="nav" onAfterClick={closeMobile} />
+            </div>
             <p className="mb-2 text-xs text-gray-400 dark:text-[#656d76]">
               {userEmail}
             </p>

@@ -5,11 +5,12 @@ import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const MESSAGES: Record<string, string> = {
-  "person-saved":    "✓ Person saved",
-  "event-saved":     "✓ Event saved",
-  "follow-up-saved": "✓ Follow-up saved",
-  "deleted":         "✓ Deleted",
-  "restored":        "✓ Data restored",
+  "person-saved":      "✓ Person saved",
+  "event-saved":       "✓ Event saved",
+  "follow-up-saved":   "✓ Follow-up saved",
+  "deleted":           "✓ Deleted",
+  "restored":          "✓ Data restored",
+  "feedback-thanks":   "Thank you for helping improve Atlas.",
 };
 
 /**
