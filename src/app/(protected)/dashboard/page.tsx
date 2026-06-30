@@ -42,12 +42,28 @@ function formatTimestamp(iso: string): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function NavStatCard({
+  label,
+  value,
+  subtitle,
+  href,
+}: {
+  label: string;
+  value: number;
+  subtitle: string | null;
+  href: string;
+}) {
   return (
-    <div className="rounded border border-gray-200 p-4">
+    <Link
+      href={href}
+      className="block rounded border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-[#1c2230]"
+    >
       <p className="text-2xl font-semibold tabular-nums">{value}</p>
       <p className="mt-0.5 text-xs text-gray-500">{label}</p>
-    </div>
+      {subtitle && (
+        <p className="mt-1 truncate text-xs text-gray-400">{subtitle}</p>
+      )}
+    </Link>
   );
 }
 
@@ -137,10 +153,30 @@ export default async function DashboardPage() {
       {/* ── Network stats ────────────────────────────────────────────── */}
       <section className="mb-8">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="People" value={stats.peopleCount} />
-          <StatCard label="Events" value={stats.eventsCount} />
-          <StatCard label="Relationships" value={stats.relationshipsCount} />
-          <StatCard label="Pending follow-ups" value={stats.pendingFollowUpsCount} />
+          <NavStatCard
+            label="People"
+            value={stats.peopleCount}
+            subtitle={stats.peopleAddedThisWeek > 0 ? `${stats.peopleAddedThisWeek} added this week` : null}
+            href="/people"
+          />
+          <NavStatCard
+            label="Events"
+            value={stats.eventsCount}
+            subtitle={stats.lastEventName ? `Last: ${stats.lastEventName}` : null}
+            href="/events"
+          />
+          <NavStatCard
+            label="Relationships"
+            value={stats.relationshipsCount}
+            subtitle={stats.relationshipsAddedThisWeek > 0 ? `${stats.relationshipsAddedThisWeek} added this week` : null}
+            href="/people"
+          />
+          <NavStatCard
+            label="Pending follow-ups"
+            value={stats.pendingFollowUpsCount}
+            subtitle={overdue.length > 0 ? `${overdue.length} overdue` : null}
+            href="#follow-ups"
+          />
         </div>
       </section>
 
@@ -238,7 +274,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* ── Follow-ups ──────────────────────────────────────────────── */}
-      <section className="mb-8">
+      <section className="mb-8" id="follow-ups">
         <h2 className="mb-3 text-base font-semibold">Follow-ups</h2>
 
         {!hasActive && (

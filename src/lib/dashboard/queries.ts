@@ -10,6 +10,9 @@ export type DashboardStats = {
   eventsCount: number;
   relationshipsCount: number;
   pendingFollowUpsCount: number;
+  peopleAddedThisWeek: number;
+  lastEventName: string | null;
+  relationshipsAddedThisWeek: number;
 };
 
 export type DashboardInsights = {
@@ -44,6 +47,8 @@ export type DashboardData = {
 export async function getDashboardData(
   supabase: SupabaseClient<Database>,
 ): Promise<DashboardData> {
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
   const [
     peopleCountResult,
     eventsCountResult,
@@ -54,6 +59,9 @@ export async function getDashboardData(
     tagsWithCounts,
     companiesResult,
     eventPeopleResult,
+    peopleWeekResult,
+    lastEventResult,
+    relWeekResult,
   ] = await Promise.all([
     supabase.from("people").select("*", { count: "exact", head: true }),
     supabase.from("events").select("*", { count: "exact", head: true }),
@@ -79,6 +87,23 @@ export async function getDashboardData(
     getTagsWithCounts(supabase),
     supabase.from("people").select("company").not("company", "is", null),
     supabase.from("event_people").select("event_id"),
+    supabase
+      .from("people")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", oneWeekAgo),
+    supabase
+      .from("events")
+      .select("name")
+      .order("event_date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (supabase as any)
+      .from("person_relationships")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", oneWeekAgo)
+      .then((r: any) => ({ count: (r?.count ?? 0) as number }))
+      .catch(() => ({ count: 0 })),
   ]);
 
   // ── Insight computations ───────────────────────────────────────────────────
@@ -125,6 +150,9 @@ export async function getDashboardData(
       eventsCount: eventsCountResult.count ?? 0,
       relationshipsCount: relCountResult.count,
       pendingFollowUpsCount: pendingCountResult.count ?? 0,
+      peopleAddedThisWeek: peopleWeekResult.count ?? 0,
+      lastEventName: (lastEventResult.data as { name: string } | null)?.name ?? null,
+      relationshipsAddedThisWeek: relWeekResult.count,
     },
     insights: {
       uniqueCompaniesCount,
