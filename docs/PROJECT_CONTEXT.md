@@ -23,7 +23,7 @@ Atlas is a personal networking CRM for professionals. It helps users capture the
 | React | v19 |
 | ORM | Supabase JS client (typed via generated `Database` type) |
 
-No ORMs, no state management libraries, no component libraries. The stack is intentionally minimal.
+No ORMs, no state management libraries, no component libraries. The stack is intentionally minimal. The one UI dependency is **`@xyflow/react` (React Flow)**, used solely for the Insights network graph.
 
 ---
 
@@ -70,7 +70,9 @@ Action-focused home at `/dashboard`. Contains only:
 Network Insights (analytics) has moved off the dashboard to its own **`/insights`** page (added to the main nav). The dashboard intentionally favours action over analytics.
 
 ### Insights (`/insights`)
-Dedicated analytics page. Renders the Network Insights section (unique companies, tags, completed follow-ups, most common tag, most represented company, avg. people per event) using the existing `getDashboardData()` computation — moved verbatim, not redesigned.
+The visual centre of Atlas. Two parts:
+- **Network Graph** (top) — a large interactive force-directed graph of the whole network (people, companies, events, tags + their connections). See "Network Graph" below.
+- **Network Insights** (below) — the analytics cards (unique companies, tags, completed follow-ups, most common tag, most represented company, avg. people per event) using the existing `getDashboardData()` computation.
 
 ### Infrastructure
 - **RLS** — row-level security enabled and forced on all tables; every query is owner-scoped
@@ -147,7 +149,9 @@ There is exactly **one** search engine. It powers the dashboard search bar, the 
 - `items.ts` — the shared `Item`/`Section` model, per-type builders, the command `Actions`, and `flattenUnique()` (cross-group dedupe).
 - `SearchResultsList.tsx` — presentational grouped list (headings + rows + active highlight), reused by both surfaces.
 - `UniversalSearchBar.tsx` — the inline bar used on the **dashboard and People page**. Empty+focused shows suggestions (Recently viewed / Recent Events / Popular Companies / Popular Tags); typing shows live groups **People → Events → Companies → Tags → Relationships**. Enter with no selection runs the full People search (`/people?q=`). `rounded-xl`, `.atlas-dropdown` animation, mobile-responsive.
-- `CommandPalette.tsx` — global modal, opened with **Cmd/Ctrl + K** (mounted in `(protected)/layout.tsx`). Same engine; sections **People → Events → Companies → Tags → Actions**. Actions: Dashboard, People, Events, Capture, Insights, Settings, New Person, New Event, Capture Person. Suggestions load lazily on first open. ESC / click-outside / Cmd+K close.
+- `CommandPalette.tsx` — global modal, opened with **Cmd/Ctrl + K** (mounted in `(protected)/layout.tsx`). Same engine; sections **People → Events → Companies → Tags → Actions**. Actions: Dashboard, People, Events, Capture, Insights, Settings, New Person, New Event, Capture Person. Suggestions load lazily on first open. ESC / click-outside / Cmd+K close. Also opens on the `atlas:command-palette` window event.
+
+**Discoverability** — `CommandPaletteTip` (`src/components/dashboard/CommandPaletteTip.tsx`) shows a one-time dismissible hint in the dashboard's top-right on first visit (dismissal stored in `localStorage` key `atlas:cmdk-tip-dismissed`). Its "Try it" button dispatches `atlas:command-palette` to open the palette. Settings › About also documents the palette + navigation shortcuts.
 
 Navigation targets (all surfaces): person → `/people/[id]`, company → `/people?q=<name>`, tag → `/people?tags=<id>`, event → `/events/[id]`, relationship → the related person's page.
 
@@ -168,6 +172,38 @@ Name results are merged first so name matches appear before location or descript
 - `router.replace()` inside `useTransition` (shows `opacity-60` pending state during navigation)
 - Accepts `pathname`, `currentSort`, `defaultSort` as props — no `useSearchParams` needed
 - Wrapped in a `<form method="GET">` for Enter-key fallback
+
+---
+
+## Network Graph (Insights)
+
+An interactive force-directed graph of the entire network, at the top of `/insights` — built as an **exploration tool**, not just a picture. Built on **React Flow (`@xyflow/react`)**; only its styling and graph generation are customised (zoom / pan / drag / viewport / minimap come from the library). Responsibilities are deliberately separated:
+
+**1. Data generation** — `src/lib/graph/queries.ts → getNetworkGraphData(supabase)`
+- Six parallel, owner-scoped reads (people, events, tags, event_people, person_tags, person_relationships) — no N+1.
+- Produces `{ nodes, edges, stats }`. Node kinds: `person` (blue), `company` (orange), `event` (green), `tag` (purple). Companies are derived from `people.company` (no company table). Edges: person↔company, person↔event, person↔tag, person↔person (relationship — carries `relType`).
+- Computes each node's `degree` (→ size) and per-node tooltip counts, plus `stats` (most-connected person/company/event by degree, largest connected community via union-find, total connections) — all once, so rendering never recomputes.
+
+**2. Layout** — `src/lib/graph/layout.ts` (pure, no React)
+- `NODE_COLORS`, relationship-type colours (`RELATIONSHIP_TYPE_COLORS` / `_LABELS` / `relationshipColor()`), `nodeSize(degree)` (wide range so hubs stand out), and `computeForceLayout()`.
+- **Community layout**: `detectCommunities()` runs dependency-free **label propagation**; the force layout seeds each community on a ring and adds a gentle gravity toward its community centre, so natural clusters (companies, events, circles) separate instead of forming one hairball, with bridge nodes settling between clusters. Still a seeded/deterministic Fruchterman–Reingold core; iteration count scales down for larger graphs. No `d3-force` dependency.
+
+**3. Node detail (lazy)** — `src/lib/graph/detail.ts` + `GET /api/graph/node?id=`
+- `getGraphNodeDetail()` fetches **person** or **event** detail on click only (reuses `getPersonTags` / `getPersonRelationships` / `getPersonFollowUps` — no duplicated queries). Company & tag panels are derived client-side from the already-loaded graph, so they need no query.
+
+**4. Rendering** — `src/components/graph/`
+- `nodes.tsx` — custom circular node (sized/coloured from data; `data.highlighted` ring; hidden centred handles so edges join node centres).
+- `GraphCanvas.tsx` — the React Flow surface: `<Background>`, `<Controls>` (zoom), `<MiniMap>` (coloured by node kind), `onlyRenderVisibleElements`, plus Panels for **Reset layout** / **Fit to screen** and the two-part **legend** (node kinds + relationship-type colours). Relationship edges are coloured by type; other edges neutral grey.
+- `NetworkGraphSection.tsx` — SSR boundary; `dynamic(..., { ssr: false })` with a skeleton (React Flow and the layout run client-only).
+
+**5. Interaction** — `src/components/graph/NetworkGraph.tsx` + `DetailsPanel.tsx`
+- Owns filter / selection / **graph-search** / tooltip state. A single `paint(selectedId, matchIds, layers)` derives all node/edge visuals; every state change happens in event handlers (no setState-in-effect).
+- **Graph search box** — typing highlights matching nodes and fades the rest immediately (client-side over loaded nodes).
+- **Filter chips** (People / Companies / Events / Tags / Relationships) toggle each layer via node/edge `hidden`.
+- **Focus mode** — click highlights the node + neighbours, dims the rest, highlights connected edges.
+- **Details panel** (`DetailsPanel.tsx`) opens beneath the graph on click and adapts by kind — Person (company, role, notes, tags, events, relationships, follow-ups, created date, open-profile button), Company (people, connected events, top contacts, search button), Event (date, location, description, attendees, open button), Tag (people count + list). Chips inside the panel re-select nodes for chained exploration.
+- **Hover** → tooltip. **Double-click** → navigate (person/event page, company/tag filtered search). **Pane click / close** → clear selection. **Reset layout** → restore computed positions + clear selection/search + refit.
+- **Graph statistics** row is read straight from `stats` (reuses the data-generation calculation — not recomputed).
 
 ---
 
@@ -386,8 +422,45 @@ In order (see ROADMAP.md for full detail):
 2. **Tags** — label people with free-form tags; filter people list by tag. Schema (`tags`, `person_tags` tables) already exists.
 3. **Dashboard (full)** — the route exists as a placeholder; needs due follow-ups, recently added people, and recent events.
 4. **Person-to-person relationships** — record how two people know each other; warm intro paths.
-5. **Network graph** — visual map of people and events.
+5. **Network graph** — ✅ shipped: interactive force-directed graph on `/insights` (see "Network Graph").
 6. **Mobile app** — native or PWA with offline-first capture.
 7. **AI features** — follow-up drafting, smart resurfacing, relationship scoring.
 
 Items 1 and 2 are highest priority and have pre-built schema support.
+
+---
+
+## Development Tooling
+
+### Demo Data Generator
+
+Located at `tools/generate_demo_data.py`. Generates realistic Atlas backup files
+that can be imported via Atlas Restore.
+
+**Install:**
+```bash
+pip install -r requirements-demo.txt
+```
+
+**Usage:**
+```bash
+python tools/generate_demo_data.py --size small
+python tools/generate_demo_data.py --size medium --seed 42
+python tools/generate_demo_data.py --size large --seed 42 --output demo-data/
+```
+
+Outputs `demo-data/atlas-demo-{size}.json`. All sizes match Atlas Restore's
+validation requirements exactly (no dangling FKs, no duplicate junction rows,
+all required fields present).
+
+| Size   | People | Events | Event links | Tags | Tag links | Follow-ups | Relationships |
+|--------|--------|--------|-------------|------|-----------|------------|---------------|
+| small  | 30     | 8      | 70          | 12   | 55        | 20         | 30            |
+| medium | 350    | 75     | 900         | 45   | 800       | 280        | 400           |
+| large  | 2500   | 500    | 7500        | 80   | 6500      | 2000       | 3500          |
+
+The generator uses a community model (tech / healthcare / academia / biotech /
+founders / VC / consulting) to produce realistic professional networks rather
+than random data. Same `--seed` always produces byte-identical output.
+
+See `tools/demo_data/README.md` for full documentation.

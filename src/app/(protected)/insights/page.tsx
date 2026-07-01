@@ -1,4 +1,6 @@
 import { getDashboardData } from "@/lib/dashboard/queries";
+import { getNetworkGraphData } from "@/lib/graph/queries";
+import { NetworkGraphSection } from "@/components/graph/NetworkGraphSection";
 import { createClient } from "@/lib/supabase/server";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -16,11 +18,19 @@ function InsightCard({ label, value }: { label: string; value: number }) {
 
 export default async function InsightsPage() {
   const supabase = await createClient();
-  const { insights } = await getDashboardData(supabase);
+  const [{ insights }, graph] = await Promise.all([
+    getDashboardData(supabase),
+    getNetworkGraphData(supabase),
+  ]);
 
   return (
     <main className="mx-auto max-w-[62rem] p-6">
-      <h1 className="mb-6 text-xl font-semibold">Network Insights</h1>
+      <h1 className="mb-6 text-xl font-semibold">Insights</h1>
+
+      {/* ── Network graph (the visual centre of Atlas) ───────────────── */}
+      <NetworkGraphSection data={graph} />
+
+      <h2 className="mb-4 text-xl font-semibold">Network Insights</h2>
 
       <div className="mb-3 grid grid-cols-3 gap-3">
         <InsightCard

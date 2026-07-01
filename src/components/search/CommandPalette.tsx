@@ -76,7 +76,8 @@ export function CommandPalette() {
     }
   }, [refreshRecent]);
 
-  // Global Cmd/Ctrl + K toggles the palette.
+  // Global Cmd/Ctrl + K toggles the palette; the `atlas:command-palette`
+  // event opens it (dispatched by the dashboard first-visit tip).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -85,8 +86,15 @@ export function CommandPalette() {
         else openPalette();
       }
     }
+    function onOpenEvent() {
+      if (!openRef.current) openPalette();
+    }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("atlas:command-palette", onOpenEvent);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("atlas:command-palette", onOpenEvent);
+    };
   }, [openPalette, closePalette]);
 
   // ── Build sections (People, Events, Companies, Tags, Actions) ───────────────

@@ -6,6 +6,7 @@ import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButt
 import { RescheduleFollowUpButtons } from "@/components/follow-ups/RescheduleFollowUpButtons";
 import { CurrentConferenceCard } from "@/components/dashboard/CurrentConferenceCard";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
+import { CommandPaletteTip } from "@/components/dashboard/CommandPaletteTip";
 import {
   completeFollowUp,
   deleteFollowUp,
@@ -144,6 +145,8 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-[62rem] p-6">
+
+      <CommandPaletteTip />
 
       {/* ── Network stats ────────────────────────────────────────────── */}
       <section className="mb-8">

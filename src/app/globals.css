@@ -28,8 +28,18 @@ a, button {
 .atlas-dropdown {
   animation: atlas-dropdown-in 120ms ease-out;
 }
+
+/* First-visit command-palette tip: subtle fade + slide from the right. */
+@keyframes atlas-tip-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.atlas-tip-in {
+  animation: atlas-tip-in 180ms ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
-  .atlas-dropdown { animation: none; }
+  .atlas-dropdown,
+  .atlas-tip-in { animation: none; }
 }
 
 /* ── Keyboard focus ring ──────────────────────────────────────────

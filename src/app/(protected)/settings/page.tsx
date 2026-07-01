@@ -146,6 +146,40 @@ export default function SettingsPage() {
             </ul>
           </div>
 
+          {/* Keyboard shortcuts */}
+          <div>
+            <p className="mb-3 text-base font-medium">Keyboard shortcuts</p>
+            <dl className="divide-y divide-gray-100 rounded border border-gray-200 dark:divide-[#30363d]">
+              {[
+                { keys: ["Ctrl", "K"], mac: true, label: "Open Command Palette" },
+                { keys: ["Enter"], label: "Open selected result" },
+                { keys: ["Esc"], label: "Close palette" },
+                { keys: ["↑", "↓"], label: "Navigate search results" },
+                { keys: ["Tab"], label: "Move between controls" },
+              ].map(({ keys, mac, label }) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between px-4 py-2.5"
+                >
+                  <span className="text-sm text-gray-600">{label}</span>
+                  <span className="flex items-center gap-1">
+                    {keys.map((k) => (
+                      <kbd
+                        key={k}
+                        className="inline-flex items-center rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-600 dark:border-[#30363d] dark:bg-[#1c2230] dark:text-[#9da7b3]"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                    {mac && (
+                      <span className="ml-1 text-xs text-gray-400">(⌘ K on Mac)</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </dl>
+          </div>
+
           {/* Data ownership */}
           <div>
             <p className="mb-2 text-base font-medium">Your data</p>
