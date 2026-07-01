@@ -66,11 +66,16 @@ export async function getDashboardData(
     supabase.from("people").select("*", { count: "exact", head: true }),
     supabase.from("events").select("*", { count: "exact", head: true }),
     // person_relationships cast until db:types is regenerated post-migration
-    (supabase as any)
-      .from("person_relationships")
-      .select("*", { count: "exact", head: true })
-      .then((r: any) => ({ count: (r?.count ?? 0) as number }))
-      .catch(() => ({ count: 0 })),
+    (async () => {
+      try {
+        const { count, error } = await (supabase as any)
+          .from("person_relationships")
+          .select("*", { count: "exact", head: true });
+        return { count: error ? 0 : ((count ?? 0) as number) };
+      } catch {
+        return { count: 0 };
+      }
+    })(),
     supabase
       .from("follow_ups")
       .select("*", { count: "exact", head: true })
@@ -98,12 +103,17 @@ export async function getDashboardData(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    (supabase as any)
-      .from("person_relationships")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", oneWeekAgo)
-      .then((r: any) => ({ count: (r?.count ?? 0) as number }))
-      .catch(() => ({ count: 0 })),
+    (async () => {
+      try {
+        const { count, error } = await (supabase as any)
+          .from("person_relationships")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", oneWeekAgo);
+        return { count: error ? 0 : ((count ?? 0) as number) };
+      } catch {
+        return { count: 0 };
+      }
+    })(),
   ]);
 
   // ── Insight computations ───────────────────────────────────────────────────

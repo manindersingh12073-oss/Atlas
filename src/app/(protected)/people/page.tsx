@@ -3,7 +3,8 @@ import { Suspense } from "react";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 
-import { PeopleSearchInput } from "@/components/people/PeopleSearchInput";
+import { UniversalSearchBar } from "@/components/search/UniversalSearchBar";
+import { getSearchSuggestions } from "@/lib/search/queries";
 import { SortSelect } from "@/components/SortSelect";
 import { TagChip } from "@/components/tags/TagChip";
 import { TagFilterBar } from "@/components/tags/TagFilterBar";
@@ -34,12 +35,13 @@ export default async function PeoplePage({ searchParams }: Props) {
 
   const supabase = await createClient();
 
-  const [people, eventDataMap, allTagsWithCounts, personTagsMap] =
+  const [people, eventDataMap, allTagsWithCounts, personTagsMap, suggestions] =
     await Promise.all([
       searchPeople(supabase, query, sort),
       getPersonEventData(supabase),
       getTagsWithCounts(supabase),
       getPersonTagsMap(supabase),
+      getSearchSuggestions(supabase),
     ]);
 
   // "Most events" sort applied in JS after joining counts.
@@ -83,9 +85,9 @@ export default async function PeoplePage({ searchParams }: Props) {
       <div className="mb-6 space-y-2">
         {/* Search + sort row */}
         <div className="flex items-center gap-2">
-          <form method="GET" action="/people" className="flex-1">
-            <PeopleSearchInput defaultValue={query} currentSort={sort} />
-          </form>
+          <div className="flex-1">
+            <UniversalSearchBar suggestions={suggestions} />
+          </div>
           <Suspense
             fallback={
               <select

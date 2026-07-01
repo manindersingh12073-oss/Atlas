@@ -18,6 +18,20 @@ a, button {
   transition-timing-function: ease;
 }
 
+/* ── Dashboard search dropdown ────────────────────────────────────
+   Subtle fade + slide-down when the results panel opens.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes atlas-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.atlas-dropdown {
+  animation: atlas-dropdown-in 120ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .atlas-dropdown { animation: none; }
+}
+
 /* ── Keyboard focus ring ──────────────────────────────────────────
    Visible for keyboard nav; suppressed for mouse/touch.
    ──────────────────────────────────────────────────────────────── */

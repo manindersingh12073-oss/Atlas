@@ -8,6 +8,7 @@ import { UncompleteFollowUpButton } from "@/components/follow-ups/UncompleteFoll
 import { DeletePersonButton } from "@/components/people/DeletePersonButton";
 import { RemovePersonButton } from "@/components/event-people/RemovePersonButton";
 import { PersonTimeline } from "@/components/people/PersonTimeline";
+import { RecordPersonView } from "@/components/people/RecordPersonView";
 import { RelationshipPicker } from "@/components/relationships/RelationshipPicker";
 import { RemoveRelationshipButton } from "@/components/relationships/RemoveRelationshipButton";
 import { TagChip } from "@/components/tags/TagChip";
@@ -127,6 +128,11 @@ export default async function PersonDetailPage({ params }: Props) {
 
   return (
     <main className="mx-auto max-w-[62rem] p-6">
+      <RecordPersonView
+        id={person.id}
+        name={person.name}
+        company={person.company}
+      />
       <div className="mb-4">
         <Link href="/people" className="text-sm text-gray-500 hover:underline">
           ← People

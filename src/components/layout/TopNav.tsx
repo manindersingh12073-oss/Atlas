@@ -45,6 +45,7 @@ const NAV_LINKS = [
   { href: "/people", label: "People" },
   { href: "/events", label: "Events" },
   { href: "/capture", label: "Capture" },
+  { href: "/insights", label: "Insights" },
 ];
 
 // ── TopNav ─────────────────────────────────────────────────────────────────

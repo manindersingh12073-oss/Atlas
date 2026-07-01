@@ -19,6 +19,8 @@ import {
 import type { FollowUpWithPerson } from "@/lib/follow-ups/queries";
 import { getCurrentConference } from "@/lib/capture/queries";
 import { getDashboardData } from "@/lib/dashboard/queries";
+import { getSearchSuggestions } from "@/lib/search/queries";
+import { UniversalSearchBar } from "@/components/search/UniversalSearchBar";
 import { createClient } from "@/lib/supabase/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -64,15 +66,6 @@ function NavStatCard({
         <p className="mt-1 truncate text-xs text-gray-400">{subtitle}</p>
       )}
     </Link>
-  );
-}
-
-function InsightCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded border border-gray-200 p-4">
-      <p className="text-xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-0.5 text-xs text-gray-500">{label}</p>
-    </div>
   );
 }
 
@@ -137,12 +130,14 @@ export default async function DashboardPage() {
     { overdue, dueToday, upcoming },
     done,
     conference,
+    suggestions,
   ] = await Promise.all([
     supabase.auth.getUser(),
     getDashboardData(supabase),
     getDashboardFollowUps(supabase),
     getDoneFollowUps(supabase),
     getCurrentConference(supabase),
+    getSearchSuggestions(supabase),
   ]);
 
   const hasActive = overdue.length + dueToday.length + upcoming.length > 0;
@@ -177,6 +172,11 @@ export default async function DashboardPage() {
             subtitle={overdue.length > 0 ? `${overdue.length} overdue` : null}
             href="#follow-ups"
           />
+        </div>
+
+        {/* ── Global network search ──────────────────────────────────── */}
+        <div className="mt-4">
+          <UniversalSearchBar suggestions={suggestions} />
         </div>
       </section>
 
@@ -229,48 +229,6 @@ export default async function DashboardPage() {
             </Link>
           </p>
         )}
-      </section>
-
-      {/* ── Network insights ─────────────────────────────────────────── */}
-      <section className="mb-8">
-        <h2 className="mb-3 text-base font-semibold">Network Insights</h2>
-
-        <div className="mb-3 grid grid-cols-3 gap-3">
-          <InsightCard
-            label="Unique companies"
-            value={insights.uniqueCompaniesCount}
-          />
-          <InsightCard label="Tags" value={insights.totalTagsCount} />
-          <InsightCard
-            label="Completed follow-ups"
-            value={insights.completedFollowUpsCount}
-          />
-        </div>
-
-        <ul className="divide-y divide-gray-100 rounded border border-gray-200">
-          {[
-            { label: "Most common tag", value: insights.mostCommonTag },
-            {
-              label: "Most represented company",
-              value: insights.mostRepresentedCompany,
-            },
-            {
-              label: "Avg. people per event",
-              value:
-                insights.avgPeoplePerEvent != null
-                  ? insights.avgPeoplePerEvent.toFixed(1)
-                  : null,
-            },
-          ].map(({ label, value }) => (
-            <li
-              key={label}
-              className="flex items-center justify-between px-4 py-3"
-            >
-              <p className="text-sm text-gray-500">{label}</p>
-              <p className="text-sm font-medium">{value ?? "—"}</p>
-            </li>
-          ))}
-        </ul>
       </section>
 
       {/* ── Follow-ups ──────────────────────────────────────────────── */}

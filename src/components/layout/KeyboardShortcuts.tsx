@@ -102,6 +102,7 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }) {
             <ShortcutRow keys={["G", "P"]} label="People" />
             <ShortcutRow keys={["G", "E"]} label="Events" />
             <ShortcutRow keys={["G", "C"]} label="Capture" />
+            <ShortcutRow keys={["G", "I"]} label="Insights" />
             <ShortcutRow keys={["G", "D"]} label="Dashboard" />
             <ShortcutRow keys={["G", "S"]} label="Settings" />
           </ShortcutGroup>
@@ -110,6 +111,7 @@ function ShortcutsDialog({ onClose }: { onClose: () => void }) {
             <ShortcutRow keys={["N"]} label="New person (People)" />
             <ShortcutRow keys={["N"]} label="New event (Events)" />
             <ShortcutRow keys={["/"]} label="Focus search" />
+            <ShortcutRow keys={["⌘/Ctrl", "K"]} label="Command palette" />
             <ShortcutRow keys={["?"]} label="This dialog" />
           </ShortcutGroup>
 
@@ -185,6 +187,9 @@ export function KeyboardShortcuts() {
             return;
           case "c":
             router.push("/capture");
+            return;
+          case "i":
+            router.push("/insights");
             return;
           case "d":
             router.push("/dashboard");

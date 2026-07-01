@@ -135,17 +135,24 @@ type PersonResult = {
 };
 
 /**
- * Searches the authenticated user's people by query string.
+ * Universal search across the authenticated user's network.
  *
  * When query is empty: returns all people with the requested sort applied.
- * When query is set: runs FTS + name ilike + company ilike in parallel,
- * merges results, and sorts alphabetically (sort param is ignored).
+ * When query is set: searches across name, company, role, notes, tag names,
+ * event names, and relationship names in two parallel rounds, then merges
+ * and sorts alphabetically (sort param is ignored during search).
+ *
+ * Round 1 (all parallel): FTS on search_vector, name ilike, company ilike,
+ *   tag name via person_tags join, event name via event_people join.
+ * Round 2 (conditional): person_relationships lookup when Round 1 name
+ *   matches exist, to surface people related to those matches.
+ *
+ * Ranking (best/lowest score wins per person, tie-break alphabetical):
+ *   0 Exact name · 1 Partial name · 2 Company · 3 Tags · 4 Events ·
+ *   5 Relationships · 6 Notes/role (FTS-only match)
  *
  * "events_desc" sort cannot be applied at the DB level; the caller is
  * responsible for JS-sorting by event count after calling getPersonEventData.
- *
- * Partial company matching uses a seq scan (no trigram index on company).
- * Fast at Atlas's user scale; add a GIN trigram index on company if needed.
  */
 export async function searchPeople(
   supabase: SupabaseClient<Database>,
@@ -177,34 +184,112 @@ export async function searchPeople(
 
   const ilikePattern = `%${q.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
 
-  const [ftsResult, fuzzyNameResult, fuzzyCompanyResult] = await Promise.all([
-    supabase
-      .from("people")
-      .select("id, name, company, role")
-      .textSearch("search_vector", q, { type: "websearch", config: "english" }),
-    supabase
-      .from("people")
-      .select("id, name, company, role")
-      .ilike("name", ilikePattern),
-    supabase
-      .from("people")
-      .select("id, name, company, role")
-      .ilike("company", ilikePattern),
-  ]);
+  // ── Round 1: all parallel ──────────────────────────────────────────────────
+  const [ftsResult, nameResult, companyResult, tagResult, eventResult] =
+    await Promise.all([
+      // FTS on search_vector (covers name, company, role, notes)
+      supabase
+        .from("people")
+        .select("id, name, company, role")
+        .textSearch("search_vector", q, { type: "websearch", config: "english" }),
+      // Name ilike
+      supabase
+        .from("people")
+        .select("id, name, company, role")
+        .ilike("name", ilikePattern),
+      // Company ilike
+      supabase
+        .from("people")
+        .select("id, name, company, role")
+        .ilike("company", ilikePattern),
+      // Tag name: person_tags joined to tags, filtered by tag name
+      (async () => {
+        try {
+          const { data, error } = await (supabase as any)
+            .from("person_tags")
+            .select("people(id, name, company, role), tags!inner(name)")
+            .ilike("tags.name", ilikePattern);
+          return { data: error ? [] : (data ?? []) };
+        } catch {
+          return { data: [] };
+        }
+      })(),
+      // Event name: event_people joined to events, filtered by event name
+      (async () => {
+        try {
+          const { data, error } = await (supabase as any)
+            .from("event_people")
+            .select("people(id, name, company, role), events!inner(name)")
+            .ilike("events.name", ilikePattern);
+          return { data: error ? [] : (data ?? []) };
+        } catch {
+          return { data: [] };
+        }
+      })(),
+    ]);
 
-  const seen = new Set<string>();
-  const combined: PersonResult[] = [];
+  // ── Round 2: relationship lookup (only when name matches exist) ────────────
+  const nameMatchIds = (nameResult.data ?? []).map((p) => p.id);
+  let relRows: Array<{
+    person_a: string;
+    person_b: string;
+    a: PersonResult | null;
+    b: PersonResult | null;
+  }> = [];
 
-  for (const person of [
-    ...(ftsResult.data ?? []),
-    ...(fuzzyNameResult.data ?? []),
-    ...(fuzzyCompanyResult.data ?? []),
-  ]) {
-    if (!seen.has(person.id)) {
-      seen.add(person.id);
-      combined.push(person);
+  if (nameMatchIds.length > 0) {
+    try {
+      const { data, error } = await (supabase as any)
+        .from("person_relationships")
+        .select(
+          "person_a, person_b, a:people!person_a(id, name, company, role), b:people!person_b(id, name, company, role)",
+        )
+        .or(
+          `person_a.in.(${nameMatchIds.join(",")}),person_b.in.(${nameMatchIds.join(",")})`,
+        );
+      relRows = (error ? [] : (data ?? [])) as typeof relRows;
+    } catch {
+      relRows = [];
     }
   }
 
-  return combined.sort((a, b) => a.name.localeCompare(b.name));
+  // ── Extract people from join results ──────────────────────────────────────
+  type JoinRow = { people: PersonResult | null };
+
+  const tagPeople = ((tagResult?.data ?? []) as JoinRow[])
+    .map((r) => r.people)
+    .filter((p): p is PersonResult => p !== null);
+
+  const eventPeople = ((eventResult?.data ?? []) as JoinRow[])
+    .map((r) => r.people)
+    .filter((p): p is PersonResult => p !== null);
+
+  // For each relationship, surface the person NOT in the name-match set
+  const nameMatchIdSet = new Set(nameMatchIds);
+  const relatedPeople: PersonResult[] = [];
+  for (const rel of relRows) {
+    if (nameMatchIdSet.has(rel.person_a) && rel.b) relatedPeople.push(rel.b);
+    if (nameMatchIdSet.has(rel.person_b) && rel.a) relatedPeople.push(rel.a);
+  }
+
+  // ── Rank: keep the best (lowest) rank each person qualifies for ─────────────
+  const qLower = q.toLowerCase();
+  const ranked = new Map<string, { person: PersonResult; rank: number }>();
+  const consider = (person: PersonResult, rank: number) => {
+    const existing = ranked.get(person.id);
+    if (!existing || rank < existing.rank) ranked.set(person.id, { person, rank });
+  };
+
+  // Buckets applied low-to-high rank; consider() keeps the strongest signal.
+  for (const p of nameResult.data ?? [])
+    consider(p, p.name.toLowerCase() === qLower ? 0 : 1); // exact vs partial name
+  for (const p of companyResult.data ?? []) consider(p, 2); // company
+  for (const p of tagPeople) consider(p, 3); // tags
+  for (const p of eventPeople) consider(p, 4); // events
+  for (const p of relatedPeople) consider(p, 5); // relationships
+  for (const p of ftsResult.data ?? []) consider(p, 6); // notes/role (FTS only)
+
+  return [...ranked.values()]
+    .sort((a, b) => a.rank - b.rank || a.person.name.localeCompare(b.person.name))
+    .map((r) => r.person);
 }

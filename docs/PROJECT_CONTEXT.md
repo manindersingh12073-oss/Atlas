@@ -59,9 +59,18 @@ All features below are fully working in the current codebase.
 - Session refresh on every request via `src/proxy.ts`
 - Profiles auto-created on signup via Postgres trigger
 
-### Dashboard (Placeholder)
-- Route exists at `/dashboard` — currently shows user email, navigation links to People and Events, and a sign-out button
-- **Not yet implemented**: due follow-ups, recently added people, recent events activity
+### Dashboard
+Action-focused home at `/dashboard`. Contains only:
+- **Statistics cards** — People / Events / Relationships / Pending follow-ups; each is a navigation card with an actionable subtitle (e.g. "3 added this week", "Last: <event>", "N overdue")
+- **Global network search** — a prominent search bar below the stats cards; see "Global Dashboard Search" below
+- **Current Conference** — shown only when people were captured today
+- **Network Activity** — recently added people
+- **Follow-ups** — overdue / due today / upcoming, plus completed
+
+Network Insights (analytics) has moved off the dashboard to its own **`/insights`** page (added to the main nav). The dashboard intentionally favours action over analytics.
+
+### Insights (`/insights`)
+Dedicated analytics page. Renders the Network Insights section (unique companies, tags, completed follow-ups, most common tag, most represented company, avg. people per event) using the existing `getDashboardData()` computation — moved verbatim, not redesigned.
 
 ### Infrastructure
 - **RLS** — row-level security enabled and forced on all tables; every query is owner-scoped
@@ -100,15 +109,49 @@ Junction between `people` and `tags`. Composite PK `(person_id, tag_id)`. `owner
 
 ## Search Functionality
 
-Both search implementations share the same shape: parallel queries → merge → deduplicate by `id` in JS → sort alphabetically. Query strings escape `%` and `_` before being used in ILIKE patterns.
+Both search implementations share the same shape: parallel queries → merge → deduplicate by `id` in JS → order (People by rank then alphabetical; Events alphabetical). Query strings escape `%` and `_` before being used in ILIKE patterns.
 
-### People search — `searchPeople()` in `src/lib/people/queries.ts`
-Three parallel queries:
-1. `.textSearch("search_vector", q, { type: "websearch", config: "english" })` — FTS across name, company, role, notes (GIN index)
-2. `.ilike("name", "%q%")` — partial name matching (GIN trigram index)
-3. `.ilike("company", "%q%")` — partial company matching (seq scan; fast at this scale)
+### People search (Universal) — `searchPeople()` in `src/lib/people/queries.ts`
+Searches across the full network in two rounds. Empty query returns all people with the active sort applied.
 
-Empty query returns all people with the active sort applied.
+**Round 1 — five parallel queries:**
+1. FTS on `search_vector` (`websearch`, `english`) — name, company, role, notes via GIN index
+2. `.ilike("name", "%q%")` — partial name matching via GIN trigram index
+3. `.ilike("company", "%q%")` — partial company matching (seq scan)
+4. `person_tags` → `tags!inner` join, filtered by `tags.name ilike "%q%"` — returns people with matching tag names
+5. `event_people` → `events!inner` join, filtered by `events.name ilike "%q%"` — returns people who attended matching events
+
+**Round 2 — conditional (only when Round 1 name matches exist):**
+6. `person_relationships` join (both sides with `people` data), filtered by `person_a.in.(nameMatchIds) OR person_b.in.(nameMatchIds)` — surfaces people related to name-matched people
+
+**Ranking** — each person is scored by the strongest signal they match (best/lowest wins), tie-broken alphabetically:
+`0` exact name · `1` partial name · `2` company · `3` tags · `4` events · `5` relationships · `6` notes/role (FTS-only). This is the single ranking used everywhere search appears.
+
+Search examples:
+- `"Google"` → people whose company contains Google
+- `"Healthcare AI Summit"` → attendees of that event
+- `"Founder"` → people with Founder tag, role, or notes mentioning Founder
+- `"Ali"` → Ali plus anyone with a recorded relationship with Ali
+
+### Atlas Search v1 — one engine, four surfaces
+There is exactly **one** search engine. It powers the dashboard search bar, the People-page search bar, the empty-state suggestions, and the command palette. No surface reimplements search.
+
+**Server engine** — `src/lib/search/queries.ts`:
+- `searchNetwork(supabase, q)` → `{ people, companies, tags, events, relationships }`. **People** is `searchPeople()` (the ranked Universal Search above); **Companies / Tags / Events** are one lightweight `ilike` query each; **Relationships** is one query for all edges (with both endpoints' names) filtered by name match in JS. All run in parallel — no N+1.
+- `getSearchSuggestions(supabase)` → `{ recentEvents, popularTags, topCompanies }` for the empty state.
+- **APIs**: `GET /api/search?q=` (grouped results) and `GET /api/search/suggestions` (empty-state suggestions). Both owner-scoped via RLS.
+
+**Shared client layer** — `src/components/search/`:
+- `useNetworkSearch()` — the one client hook: query state, 200ms debounced fetch to `/api/search` (race-guarded), loading, and the localStorage recent-viewed list.
+- `useListNav()` — shared keyboard navigation over the flattened item list. Tracks the active row by **key** (not index) so new results don't need a reset effect. Supports ↑ ↓ Enter Escape Tab.
+- `items.ts` — the shared `Item`/`Section` model, per-type builders, the command `Actions`, and `flattenUnique()` (cross-group dedupe).
+- `SearchResultsList.tsx` — presentational grouped list (headings + rows + active highlight), reused by both surfaces.
+- `UniversalSearchBar.tsx` — the inline bar used on the **dashboard and People page**. Empty+focused shows suggestions (Recently viewed / Recent Events / Popular Companies / Popular Tags); typing shows live groups **People → Events → Companies → Tags → Relationships**. Enter with no selection runs the full People search (`/people?q=`). `rounded-xl`, `.atlas-dropdown` animation, mobile-responsive.
+- `CommandPalette.tsx` — global modal, opened with **Cmd/Ctrl + K** (mounted in `(protected)/layout.tsx`). Same engine; sections **People → Events → Companies → Tags → Actions**. Actions: Dashboard, People, Events, Capture, Insights, Settings, New Person, New Event, Capture Person. Suggestions load lazily on first open. ESC / click-outside / Cmd+K close.
+
+Navigation targets (all surfaces): person → `/people/[id]`, company → `/people?q=<name>`, tag → `/people?tags=<id>`, event → `/events/[id]`, relationship → the related person's page.
+
+**Recent-viewed people** — `src/lib/search/recent-people.ts` (`readRecentPeople` / `recordPersonView`) persists the last 5 viewed people in `localStorage` (key `atlas:recent-people`). `RecordPersonView` (mounted on the person detail page) writes on view. No DB table or dependency.
 
 ### Events search — `searchEvents()` in `src/lib/events/queries.ts`
 Four parallel queries:
@@ -120,12 +163,11 @@ Four parallel queries:
 Name results are merged first so name matches appear before location or description matches. Empty query delegates to `getEvents()`.
 
 ### SearchInput component — `src/components/SearchInput.tsx`
-- Generic Client Component; used by both pages
+- Generic Client Component; used by the **Events page** for in-place `?q=` list filtering (the People page now uses `UniversalSearchBar` instead)
 - Debounced 300ms via `useRef` timer
 - `router.replace()` inside `useTransition` (shows `opacity-60` pending state during navigation)
 - Accepts `pathname`, `currentSort`, `defaultSort` as props — no `useSearchParams` needed
 - Wrapped in a `<form method="GET">` for Enter-key fallback
-- `PeopleSearchInput` (`src/components/people/PeopleSearchInput.tsx`) is a thin wrapper binding people-specific props
 
 ---
 
