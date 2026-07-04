@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind CSS v4 — class-based dark mode.
+ * ThemeScript in layout.tsx sets .dark on <html> before hydration (no FOUC).
+ * ThemeProvider reacts to OS-level changes.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Smooth transitions ───────────────────────────────────────────
+   Applied broadly so hover states feel responsive without being heavy.
+   150 ms matches the duration used throughout the codebase.
+   ──────────────────────────────────────────────────────────────── */
+a, button {
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+/* ── Dashboard search dropdown ────────────────────────────────────
+   Subtle fade + slide-down when the results panel opens.
+   ──────────────────────────────────────────────────────────────── */
+@keyframes atlas-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.atlas-dropdown {
+  animation: atlas-dropdown-in 120ms ease-out;
+}
+
+/* First-visit command-palette tip: subtle fade + slide from the right. */
+@keyframes atlas-tip-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.atlas-tip-in {
+  animation: atlas-tip-in 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .atlas-dropdown,
+  .atlas-tip-in { animation: none; }
+}
+
+/* ── Keyboard focus ring ──────────────────────────────────────────
+   Visible for keyboard nav; suppressed for mouse/touch.
+   ──────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   ATLAS DARK PALETTE
+   Inspired by GitHub Dark, Linear, and Vercel — soft, low contrast,
+   reduced saturation. Pure black (#000) is never used.
+   ──────────────────────────────────────────────────────────────── */
+
+.dark {
+  --d-bg:            #0f1117;   /* main background */
+  --d-card:          #161b22;   /* card / section background */
+  --d-surface:       #1e2330;   /* secondary surface, inputs */
+  --d-border:        #30363d;   /* card borders, dividers */
+  --d-border-input:  #3d444e;   /* input / select borders */
+  --d-hover:         #1c2230;   /* row hover — slightly brighter than bg */
+  --d-text:          #e6edf3;   /* primary text */
+  --d-text-sec:      #8b949e;   /* secondary text */
+  --d-text-muted:    #656d76;   /* muted / placeholder text */
+}
+
+/* ── Body ────────────────────────────────────────────────────────
+   Set on the <body> in layout.tsx via dark:bg-[...] / dark:text-[...]
+   These rules act as additional insurance.
+   ──────────────────────────────────────────────────────────────── */
+
+/* ── Background overrides ────────────────────────────────────────
+   Override Tailwind's gray utility classes for dark mode.
+   Specificity: .dark + utility class > plain utility class — no !important needed.
+   ──────────────────────────────────────────────────────────────── */
+
+/* White backgrounds become the main dark background */
+.dark .bg-white { background-color: var(--d-bg); }
+
+/* Subtle surface / secondary areas */
+.dark .bg-gray-50  { background-color: var(--d-surface); }
+.dark .bg-gray-100 { background-color: var(--d-surface); }
+
+/* ── Hover states ─────────────────────────────────────────────────
+   THE key fix: hover:bg-gray-50 was white in dark mode, making
+   row content (dark text on white) unreadable.
+   ──────────────────────────────────────────────────────────────── */
+
+.dark .hover\:bg-gray-50:hover  { background-color: var(--d-hover); }
+.dark .hover\:bg-gray-100:hover { background-color: var(--d-hover); }
+
+/* ── Border overrides ────────────────────────────────────────────── */
+
+.dark .border-gray-100 { border-color: var(--d-border); }
+.dark .border-gray-200 { border-color: var(--d-border); }
+.dark .border-gray-300 { border-color: var(--d-border-input); }
+
+/* Dividers */
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--d-border); }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--d-border); }
+
+/* ── Text overrides ──────────────────────────────────────────────── */
+
+.dark .text-gray-900 { color: var(--d-text); }
+.dark .text-gray-800 { color: var(--d-text); }
+.dark .text-gray-700 { color: var(--d-text); }
+.dark .text-gray-600 { color: var(--d-text-sec); }
+.dark .text-gray-500 { color: var(--d-text-sec); }
+.dark .text-gray-400 { color: var(--d-text-muted); }
+
+/* ── Component-specific overrides ────────────────────────────────── */
+
+/* Duplicate detection / amber warning panel */
+.dark .bg-amber-50     { background-color: #2a2217; }
+.dark .border-amber-200 { border-color: #4d3b18; }
+.dark .text-amber-700   { color: #d4a44c; }
+.dark .text-amber-600   { color: #c49840; }
+
+/* Red error panel */
+.dark .bg-red-50       { background-color: #220e0e; }
+.dark .border-red-200  { border-color: #4d1515; }
+.dark .text-red-700    { color: #f47174; }
+.dark .text-red-600    { color: #f47174; }
+
+/* Blue info panels */
+.dark .bg-blue-50      { background-color: #0d1f2d; }
+.dark .border-blue-200 { border-color: #1a3a52; }
+.dark .text-blue-600   { color: #58a6ff; }
+
+/* Green success */
+.dark .text-green-500  { color: #3fb950; }
+.dark .text-green-600  { color: #3fb950; }
+
+/* Inputs and selects */
+.dark input:not([type="file"]),
+.dark select,
+.dark textarea {
+  background-color: var(--d-surface);
+  border-color: var(--d-border-input);
+  color: var(--d-text);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--d-text-muted);
+}

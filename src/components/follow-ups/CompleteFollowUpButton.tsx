@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 
 import { Spinner } from "@/components/ui/Spinner";
+import { useDemoGuard } from "@/lib/demo/context";
 
 export function CompleteFollowUpButton({
   completeAction,
@@ -10,11 +11,12 @@ export function CompleteFollowUpButton({
   completeAction: () => Promise<void>;
 }) {
   const [pending, startTransition] = useTransition();
+  const guard = useDemoGuard();
 
   return (
     <button
       type="button"
-      onClick={() => startTransition(() => completeAction())}
+      onClick={() => guard(() => startTransition(() => completeAction()))}
       disabled={pending}
       className="text-xs text-green-600 hover:underline disabled:opacity-50"
     >

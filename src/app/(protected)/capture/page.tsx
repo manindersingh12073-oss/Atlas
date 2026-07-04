@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import { CaptureForm } from "@/components/capture/CaptureForm";
+import { DemoBlockedPage } from "@/components/demo/DemoBlockedPage";
 import { getCapturedToday, getRecentCompanies, getRecentPeople } from "@/lib/capture/queries";
+import { isDemoMode } from "@/lib/demo/session";
 import { getCompanySuggestions } from "@/lib/people/queries";
 import { getTagsWithCounts } from "@/lib/tags/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -29,6 +31,8 @@ export default async function CapturePage({ searchParams }: Props) {
   const relTarget = params.relationshipTarget;
   const relType = params.relationshipType;
   const returnTo = isSafeReturnTo(params.returnTo) ? params.returnTo : undefined;
+
+  if (await isDemoMode()) return <DemoBlockedPage backHref={returnTo ?? "/dashboard"} backLabel="Dashboard" />;
 
   const supabase = await createClient();
 

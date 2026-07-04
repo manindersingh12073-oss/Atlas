@@ -6,9 +6,68 @@
 
 ## What Atlas Is
 
-Atlas is a personal networking CRM for professionals. It helps users capture the people they meet, the events they attend, and the context behind each relationship — and resurfaces that information when it matters.
+Atlas is **the networking memory assistant**. It helps professionals capture the people they meet, the events they attend, and the context behind each relationship — and resurfaces that information when it matters.
 
 **Not** a team tool, a public directory, or a social network. Single-user, private, owner-scoped by design.
+
+Core proposition: *You leave a conference. You open Atlas. You remember everyone.*
+
+---
+
+## Landing Page (`/`)
+
+A full marketing homepage for unauthenticated visitors. Authenticated users are redirected to `/dashboard` by both the middleware and the page itself.
+
+**Sections:**
+1. **Sticky header** — Logo, Features, How it works, Pricing (Coming Soon), Feedback, Sign in
+2. **Hero** — "Never forget the people you meet." + product mockup (HTML/CSS browser window) + **"Start free with Google" / "Try Demo"** CTA pair
+3. **Problem** — "Networking is easy. Remembering isn't." — 3 cards (Meet / Capture / Reconnect)
+4. **Workflow** (`#workflow`) — Conference → Open Atlas → Capture → Atlas organises → Reconnect
+5. **Features** (`#features`) — 8 feature cards
+6. **Comparison** — Without Atlas vs With Atlas
+7. **Audience** — Built for (persona chips)
+8. **Testimonials** — 3 placeholder quotes (marked in code comments for replacement before launch)
+9. **FAQ** — 6 questions using `<details>/<summary>` (no JS required)
+10. **Final CTA** — "Start remembering every conversation." + Google sign-in / Try Demo pair
+11. **Footer** — Privacy, Terms, Feedback, Version
+
+**Implementation notes:**
+- All sign-in buttons use `<form action={signInWithGoogle}>` — no intermediate `/login` step for CTAs
+- **"Try Demo"** (`<Link href="/demo">`) is a plain navigation to the Demo Mode entry route — see "Demo Mode" below
+- Product mockup is pure HTML/CSS (no images, no screenshots) — a browser-window-style illustration of the Atlas person profile page
+- `scroll-behavior: smooth` on the root div for anchor navigation
+- `src/lib/supabase/middleware.ts` redirects authenticated users on both `/` and `/login` to `/dashboard`
+- Testimonials are marked `/* PLACEHOLDER — replace before launch */` in the source
+
+---
+
+## Demo Mode
+
+Lets anyone explore the full authenticated app at `/dashboard`, `/people`, `/events`, `/insights`, etc. — with zero sign-up — by swapping the data source, not the route tree. **No Atlas page is duplicated for Demo Mode.**
+
+**Entry/exit:**
+- `GET /demo` (`src/app/demo/route.ts`) sets an httpOnly `atlas_demo=1` cookie (30-day expiry) and redirects to `/dashboard`. Linked from the landing page's "Try Demo" CTAs.
+- `GET /demo/exit?next=<path>` (`src/app/demo/exit/route.ts`) clears the cookie and redirects (defaults to `/login`). Used by the "Exit demo" nav link, the demo banner, and the read-only notice's "Create my Atlas" button.
+- `src/lib/supabase/middleware.ts` and `(protected)/layout.tsx` both treat a valid `atlas_demo` cookie as authorization when there is no real Supabase session — a real session always takes precedence. `isDemoMode()` (`src/lib/demo/session.ts`) is the one server-side check every page/route uses.
+
+**Data source — the adapter pattern:**
+- `public/demo/atlas-demo.json` is the single source of truth: a file in the exact Atlas backup format (`meta`/`profile`/`people`/`events`/`event_people`/`tags`/`person_tags`/`follow_ups`/`relationships`) that also passes `validateBackup()`. Regenerate it with `python tools/generate_demo_data.py --size demo --seed <n> --output public/demo` (see Development Tooling below) — no code changes required.
+- `src/lib/demo/dataset.ts` imports that JSON once (module-level singleton) and indexes it (`peopleById`, `eventsById`, `tagsById`).
+- `src/lib/demo/queries.ts` is a pure-JS mirror of every Supabase-backed query function Atlas pages use (`searchPeopleDemo`, `getDashboardDataDemo`, `getNetworkGraphDataDemo`, `getGraphNodeDetailDemo`, etc.) — same function shapes as their real counterparts, computed over the in-memory dataset instead of SQL.
+- Every protected page branches once, at the top, on `await isDemoMode()`: call the `*Demo` query function or the real Supabase-backed one, then render identically either way. Components never know which source produced their props. `/api/search`, `/api/search/suggestions`, `/api/graph/node`, `/api/export/json`, and `/api/export/zip` branch the same way (Export must work in Demo Mode — see Welcome Tour below).
+
+**Read-only enforcement:**
+- Demo visitors have no real Supabase session, so every server action's own `getUser()` check already fails closed — a write that somehow reached the server redirects to `/login` rather than mutating anything. This is a safety net, not the primary UX.
+- The primary UX is `src/lib/demo/context.tsx`: `DemoModeProvider`/`useDemoMode()` (a React context set once in `(protected)/layout.tsx`) and `useDemoGuard()`, a hook every write-triggering leaf component (`DeletePersonButton`, `DeleteEventButton`, `RemovePersonButton`, `*FollowUpButton`, `RemoveRelationshipButton`, `TagPicker`, `TagChip`, `RelationshipPicker`, `RestoreSection`) calls before invoking its bound server action. In Demo Mode the action is never called — `dispatchDemoBlocked()` fires the `atlas:demo-blocked` window event instead (same idiom as the existing `atlas:command-palette` / `atlas:shortcuts` events).
+- `DemoModeModal` (mounted once in the protected layout) listens for that event and shows the read-only notice as an overlay.
+- Routes that are *entirely* about writing (`/people/new`, `/people/[id]/edit`, `/people/[id]/link-event`, `/people/[id]/add-event`, `/people/[id]/follow-ups/new`, `/people/[id]/follow-ups/[id]/edit`, `/events/new`, `/events/[id]/edit`, `/events/[id]/link-person`, `/events/[id]/add-person`, `/events/[id]/people/[id]/edit-note`, `/capture`, `/events/[id]/capture`) each check `isDemoMode()` first and render `<DemoBlockedPage>` instead of the real form — reached the same way whether the visitor clicked a link, used the Command Palette, typed a keyboard shortcut, or entered the URL directly, since none of those are intercepted separately.
+- Both the full-page and overlay notices render the same `DemoBlockedNotice` copy/CTA component.
+
+**Banner + welcome tour:**
+- `DemoBanner` — persistent strip below `TopNav` when `isDemo`.
+- `DemoWelcomeTour` — a dismissible bottom-right checklist (8 suggested actions, e.g. "Search for Sarah", "View the Network Graph"), self-reported (click a row to check it off) rather than auto-detected. Progress and dismissal persist in `localStorage` (`atlas:demo-tour-progress` / `atlas:demo-tour-dismissed`); reopen it from Settings via `ReplayTourButton`, which dispatches `atlas:demo-tour-reopen`.
+
+**Showcase dataset:** ~40 people / 10 events / ~100 event links / 20 tags / ~70 tag links / ~35 follow-ups / ~90 relationships spanning Healthcare, AI, Research, Universities, Startups, Investors, and Consulting. One person ("Sarah Okafor", founder of an AI-diagnostics startup) is deliberately the highest-degree node in the graph (most events, relationships, tags, and a pending follow-up) so the welcome tour's first steps land somewhere impressive; a handful of "bridge" people span two communities so the network graph shows connected clusters rather than isolated islands.
 
 ---
 
@@ -204,6 +263,7 @@ An interactive force-directed graph of the entire network, at the top of `/insig
 - **Details panel** (`DetailsPanel.tsx`) opens beneath the graph on click and adapts by kind — Person (company, role, notes, tags, events, relationships, follow-ups, created date, open-profile button), Company (people, connected events, top contacts, search button), Event (date, location, description, attendees, open button), Tag (people count + list). Chips inside the panel re-select nodes for chained exploration.
 - **Hover** → tooltip. **Double-click** → navigate (person/event page, company/tag filtered search). **Pane click / close** → clear selection. **Reset layout** → restore computed positions + clear selection/search + refit.
 - **Graph statistics** row is read straight from `stats` (reuses the data-generation calculation — not recomputed).
+- **`GraphHelpPanel.tsx`** — a collapsible "How to use the Network Graph" panel above the graph, expanded on first visit and permanently dismissible ("Don't show again", `localStorage` key `atlas:graph-help-dismissed`).
 
 ---
 
@@ -229,6 +289,20 @@ Sort is applied at the DB level for all options **except** those requiring a cou
 
 **Events** (default: `date_desc`):
 `date_desc`, `date_asc`, `name_asc`, `name_desc`, `people_desc`, `people_asc`, `created_desc`
+
+---
+
+## List Performance (progressive loading)
+
+Long lists render only a window of items via `ProgressiveList` (`src/components/ui/ProgressiveList.tsx`), a shared Client Component. Applied to **People**, **Events**, and every dashboard **Follow-ups** list (overdue / due today / upcoming groups + completed).
+
+- Server pages fetch data as before (no new queries) and pass their already-rendered `<li>` rows as an `items: ReactNode[]` prop; `ProgressiveList` slices to the visible window, so thousands of cards are never mounted at once.
+- **Page size** selector: 25 / 50 / 100 / 250 / All, default **50**, remembered per-list in `localStorage` (`atlas:pagesize:{people|events|followups}`). The stored preference is applied post-mount via `requestAnimationFrame` to avoid an SSR/hydration mismatch.
+- **"Load more"** appends another batch equal to the page size (progressive, not paginated); shows the remaining count.
+- Header shows **"Showing X of Y {label}"**.
+- **Search** (`showAll` prop, set from `?q=`) bypasses paging and shows the entire matched set; because the component keeps its `loaded` state across re-renders, clearing search returns to the previously loaded amount.
+- The completed-follow-ups list fetches up to 1000 rows (`getDoneFollowUps(supabase, 1000)`) so the count and "Load more" are meaningful.
+- The dashboard's active follow-up groups (overdue / due today / upcoming) use `compact` mode: the count + page-size control only appear when a group exceeds one page, so short groups stay clean while a long Overdue list still pages. All follow-up lists share one page-size preference (`atlas:pagesize:followups`).
 
 ---
 
@@ -447,6 +521,7 @@ pip install -r requirements-demo.txt
 python tools/generate_demo_data.py --size small
 python tools/generate_demo_data.py --size medium --seed 42
 python tools/generate_demo_data.py --size large --seed 42 --output demo-data/
+python tools/generate_demo_data.py --size demo --seed 42 --output public/demo
 ```
 
 Outputs `demo-data/atlas-demo-{size}.json`. All sizes match Atlas Restore's
@@ -458,6 +533,14 @@ all required fields present).
 | small  | 30     | 8      | 70          | 12   | 55        | 20         | 30            |
 | medium | 350    | 75     | 900         | 45   | 800       | 280        | 400           |
 | large  | 2500   | 500    | 7500        | 80   | 6500      | 2000       | 3500          |
+| demo   | 40     | 10     | ~100        | 20   | ~65       | 35         | ~80           |
+
+The `demo` size additionally runs a showcase-curation pass (`config.showcase = True`
+in `tools/demo_data/config.py`) that guarantees a single dominant hub person, a few
+cross-community bridge people, and all 5 relationship types are represented — see
+"Demo Mode" above. Its output must land at exactly `public/demo/atlas-demo.json`
+(rename `atlas-demo-demo.json` if the generator's default naming is used) since
+that exact path is imported directly by `src/lib/demo/dataset.ts`.
 
 The generator uses a community model (tech / healthcare / academia / biotech /
 founders / VC / consulting) to produce realistic professional networks rather

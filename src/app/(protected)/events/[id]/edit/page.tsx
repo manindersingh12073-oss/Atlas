@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DemoBlockedPage } from "@/components/demo/DemoBlockedPage";
 import { EventForm } from "@/components/events/EventForm";
 import { updateEvent } from "@/lib/events/actions";
 import type { ActionState } from "@/lib/events/actions";
+import { isDemoMode } from "@/lib/demo/session";
 import { createClient } from "@/lib/supabase/server";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function EditEventPage({ params }: Props) {
   const { id } = await params;
+
+  if (await isDemoMode()) return <DemoBlockedPage backHref={`/events/${id}`} backLabel="Event" />;
+
   const supabase = await createClient();
 
   const { data: event } = await supabase

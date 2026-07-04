@@ -4,9 +4,13 @@ import { ExportButtons } from "@/components/export/ExportButtons";
 import { RestoreSection } from "@/components/settings/RestoreSection";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import { FeedbackButton } from "@/components/ui/FeedbackButton";
+import { ReplayTourButton } from "@/components/demo/ReplayTourButton";
+import { isDemoMode } from "@/lib/demo/session";
 import { ATLAS_VERSION } from "@/lib/export/formatters";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const isDemo = await isDemoMode();
+
   return (
     <main className="mx-auto max-w-[62rem] p-6 pb-24">
       <h1 className="mb-10 text-2xl font-semibold">Settings</h1>
@@ -29,6 +33,16 @@ export default function SettingsPage() {
             System follows your device&apos;s dark or light mode setting.
           </p>
         </div>
+
+        {isDemo && (
+          <div className="mt-8">
+            <p className="mb-1 text-base font-medium">Welcome tour</p>
+            <p className="mb-3 text-sm text-gray-500">
+              Replay the guided checklist introducing Atlas&apos;s main features.
+            </p>
+            <ReplayTourButton />
+          </div>
+        )}
       </section>
 
       {/* ════════════════════════════════════════════════════════════

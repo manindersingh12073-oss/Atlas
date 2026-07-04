@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 
 import { Spinner } from "@/components/ui/Spinner";
+import { useDemoGuard } from "@/lib/demo/context";
 
 export function RemovePersonButton({
   removeAction,
@@ -12,10 +13,13 @@ export function RemovePersonButton({
   confirmMessage?: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const guard = useDemoGuard();
 
   function handleClick() {
-    if (!confirm(confirmMessage)) return;
-    startTransition(() => removeAction());
+    guard(() => {
+      if (!confirm(confirmMessage)) return;
+      startTransition(() => removeAction());
+    });
   }
 
   return (

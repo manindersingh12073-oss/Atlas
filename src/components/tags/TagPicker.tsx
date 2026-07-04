@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { addTagToPerson, createAndAddTag } from "@/lib/tags/actions";
 import type { TagWithCount } from "@/lib/tags/queries";
+import { useDemoGuard } from "@/lib/demo/context";
 
 type Props = {
   personId: string;
@@ -24,6 +25,7 @@ export function TagPicker({
   const [pending, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const guard = useDemoGuard();
 
   const attachedSet = new Set(personTagIds);
   const q = query.trim().toLowerCase();
@@ -111,7 +113,7 @@ export function TagPicker({
     <div ref={containerRef} className="relative inline-block">
       <button
         type="button"
-        onClick={openPicker}
+        onClick={() => guard(openPicker)}
         disabled={pending}
         className="inline-flex items-center rounded border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-400 hover:border-gray-400 hover:text-gray-600 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500"
       >

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DemoBlockedPage } from "@/components/demo/DemoBlockedPage";
 import { PersonForm } from "@/components/people/PersonForm";
 import { updatePerson } from "@/lib/people/actions";
 import type { ActionState } from "@/lib/people/actions";
+import { isDemoMode } from "@/lib/demo/session";
 import { getCompanySuggestions } from "@/lib/people/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,6 +13,9 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function EditPersonPage({ params }: Props) {
   const { id } = await params;
+
+  if (await isDemoMode()) return <DemoBlockedPage backHref={`/people/${id}`} backLabel="Person" />;
+
   const supabase = await createClient();
 
   const [{ data: person }, companies] = await Promise.all([

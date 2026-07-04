@@ -5,6 +5,8 @@ import { DeleteEventButton } from "@/components/events/DeleteEventButton";
 import { RemovePersonButton } from "@/components/event-people/RemovePersonButton";
 import { deleteEvent } from "@/lib/events/actions";
 import { removePersonFromEvent } from "@/lib/event-people/actions";
+import { isDemoMode } from "@/lib/demo/session";
+import { getEventPersonLinksDemo, getEventRecordDemo } from "@/lib/demo/queries";
 import { createClient } from "@/lib/supabase/server";
 
 function formatEventDate(dateStr: string): string {
@@ -42,24 +44,31 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function EventDetailPage({ params }: Props) {
   const { id } = await params;
-  const supabase = await createClient();
+  const isDemo = await isDemoMode();
 
-  const [eventResult, linkedResult] = await Promise.all([
-    supabase
-      .from("events")
-      .select("id, name, event_date, location, description, created_at, updated_at")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("event_people")
-      .select("encounter_note, person_id, people(id, name, company, role)")
-      .eq("event_id", id),
-  ]);
+  const { event, linkedPeople } = isDemo
+    ? { event: getEventRecordDemo(id), linkedPeople: getEventPersonLinksDemo(id) as PersonLink[] }
+    : await (async () => {
+        const supabase = await createClient();
+        const [eventResult, linkedResult] = await Promise.all([
+          supabase
+            .from("events")
+            .select("id, name, event_date, location, description, created_at, updated_at")
+            .eq("id", id)
+            .single(),
+          supabase
+            .from("event_people")
+            .select("encounter_note, person_id, people(id, name, company, role)")
+            .eq("event_id", id),
+        ]);
+        return {
+          event: eventResult.data,
+          linkedPeople: (linkedResult.data ?? []) as PersonLink[],
+        };
+      })();
 
-  if (!eventResult.data) notFound();
+  if (!event) notFound();
 
-  const event = eventResult.data;
-  const linkedPeople = (linkedResult.data ?? []) as PersonLink[];
   const peopleCount = linkedPeople.length;
 
   const deleteEventWithId = deleteEvent.bind(null, event.id);

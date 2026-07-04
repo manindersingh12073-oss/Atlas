@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DemoBlockedPage } from "@/components/demo/DemoBlockedPage";
 import { FollowUpForm } from "@/components/follow-ups/FollowUpForm";
 import { updateFollowUp } from "@/lib/follow-ups/actions";
 import type { ActionState } from "@/lib/follow-ups/actions";
+import { isDemoMode } from "@/lib/demo/session";
 import { createClient } from "@/lib/supabase/server";
 
 // Only /dashboard is allowed as an external returnTo to prevent open redirects.
@@ -17,6 +19,9 @@ type Props = {
 export default async function EditFollowUpPage({ params, searchParams }: Props) {
   const { id, followUpId } = await params;
   const { returnTo } = await searchParams;
+
+  if (await isDemoMode()) return <DemoBlockedPage backHref={`/people/${id}`} backLabel="Person" />;
+
   const supabase = await createClient();
 
   const [personResult, followUpResult] = await Promise.all([

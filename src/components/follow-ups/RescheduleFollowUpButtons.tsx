@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 
+import { useDemoGuard } from "@/lib/demo/context";
+
 type Props = {
   tomorrowAction: () => Promise<void>;
   sevenDayAction: () => Promise<void>;
@@ -16,6 +18,7 @@ export function RescheduleFollowUpButtons({
   const [pendingTomorrow, startTomorrow] = useTransition();
   const [pending7d, start7d] = useTransition();
   const [pending30d, start30d] = useTransition();
+  const guard = useDemoGuard();
 
   const anyPending = pendingTomorrow || pending7d || pending30d;
 
@@ -23,7 +26,7 @@ export function RescheduleFollowUpButtons({
     <div className="flex items-center gap-2">
       <button
         type="button"
-        onClick={() => startTomorrow(() => tomorrowAction())}
+        onClick={() => guard(() => startTomorrow(() => tomorrowAction()))}
         disabled={anyPending}
         className="text-xs text-amber-600 hover:underline disabled:opacity-50"
       >
@@ -32,7 +35,7 @@ export function RescheduleFollowUpButtons({
       <span className="text-xs text-gray-300" aria-hidden>·</span>
       <button
         type="button"
-        onClick={() => start7d(() => sevenDayAction())}
+        onClick={() => guard(() => start7d(() => sevenDayAction()))}
         disabled={anyPending}
         className="text-xs text-amber-600 hover:underline disabled:opacity-50"
       >
@@ -41,7 +44,7 @@ export function RescheduleFollowUpButtons({
       <span className="text-xs text-gray-300" aria-hidden>·</span>
       <button
         type="button"
-        onClick={() => start30d(() => thirtyDayAction())}
+        onClick={() => guard(() => start30d(() => thirtyDayAction()))}
         disabled={anyPending}
         className="text-xs text-amber-600 hover:underline disabled:opacity-50"
       >

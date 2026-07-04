@@ -7,6 +7,7 @@ import { RescheduleFollowUpButtons } from "@/components/follow-ups/RescheduleFol
 import { CurrentConferenceCard } from "@/components/dashboard/CurrentConferenceCard";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { CommandPaletteTip } from "@/components/dashboard/CommandPaletteTip";
+import { ProgressiveList } from "@/components/ui/ProgressiveList";
 import {
   completeFollowUp,
   deleteFollowUp,
@@ -22,6 +23,14 @@ import { getCurrentConference } from "@/lib/capture/queries";
 import { getDashboardData } from "@/lib/dashboard/queries";
 import { getSearchSuggestions } from "@/lib/search/queries";
 import { UniversalSearchBar } from "@/components/search/UniversalSearchBar";
+import { isDemoMode } from "@/lib/demo/session";
+import {
+  getCurrentConferenceDemo,
+  getDashboardDataDemo,
+  getDashboardFollowUpsDemo,
+  getDoneFollowUpsDemo,
+  getSearchSuggestionsDemo,
+} from "@/lib/demo/queries";
 import { createClient } from "@/lib/supabase/server";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,25 +130,29 @@ function FollowUpCard({ f, groupColor }: { f: FollowUpWithPerson; groupColor?: s
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
+  const isDemo = await isDemoMode();
 
-  const [
-    {
-      data: { user },
-    },
-    { stats, insights, recentPeople },
-    { overdue, dueToday, upcoming },
-    done,
-    conference,
-    suggestions,
-  ] = await Promise.all([
-    supabase.auth.getUser(),
-    getDashboardData(supabase),
-    getDashboardFollowUps(supabase),
-    getDoneFollowUps(supabase),
-    getCurrentConference(supabase),
-    getSearchSuggestions(supabase),
-  ]);
+  const { stats, insights, recentPeople, overdue, dueToday, upcoming, done, conference, suggestions } =
+    isDemo
+      ? {
+          ...getDashboardDataDemo(),
+          ...getDashboardFollowUpsDemo(),
+          done: getDoneFollowUpsDemo(1000),
+          conference: getCurrentConferenceDemo(),
+          suggestions: getSearchSuggestionsDemo(),
+        }
+      : await (async () => {
+          const supabase = await createClient();
+          const [{ stats, insights, recentPeople }, { overdue, dueToday, upcoming }, done, conference, suggestions] =
+            await Promise.all([
+              getDashboardData(supabase),
+              getDashboardFollowUps(supabase),
+              getDoneFollowUps(supabase, 1000),
+              getCurrentConference(supabase),
+              getSearchSuggestions(supabase),
+            ]);
+          return { stats, insights, recentPeople, overdue, dueToday, upcoming, done, conference, suggestions };
+        })();
 
   const hasActive = overdue.length + dueToday.length + upcoming.length > 0;
 
@@ -254,11 +267,15 @@ export default async function DashboardPage() {
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-red-600">
               Overdue
             </p>
-            <ul className="divide-y divide-gray-100 rounded border border-red-200">
-              {overdue.map((f) => (
+            <ProgressiveList
+              storageKey="atlas:pagesize:followups"
+              label="follow-ups"
+              compact
+              listClassName="divide-y divide-gray-100 rounded border border-red-200"
+              items={overdue.map((f) => (
                 <FollowUpCard key={f.id} f={f} groupColor="text-red-600" />
               ))}
-            </ul>
+            />
           </div>
         )}
 
@@ -267,11 +284,15 @@ export default async function DashboardPage() {
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-700">
               Due today
             </p>
-            <ul className="divide-y divide-gray-100 rounded border border-gray-200">
-              {dueToday.map((f) => (
+            <ProgressiveList
+              storageKey="atlas:pagesize:followups"
+              label="follow-ups"
+              compact
+              listClassName="divide-y divide-gray-100 rounded border border-gray-200"
+              items={dueToday.map((f) => (
                 <FollowUpCard key={f.id} f={f} />
               ))}
-            </ul>
+            />
           </div>
         )}
 
@@ -280,11 +301,15 @@ export default async function DashboardPage() {
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
               Upcoming
             </p>
-            <ul className="divide-y divide-gray-100 rounded border border-gray-200">
-              {upcoming.map((f) => (
+            <ProgressiveList
+              storageKey="atlas:pagesize:followups"
+              label="follow-ups"
+              compact
+              listClassName="divide-y divide-gray-100 rounded border border-gray-200"
+              items={upcoming.map((f) => (
                 <FollowUpCard key={f.id} f={f} />
               ))}
-            </ul>
+            />
           </div>
         )}
 

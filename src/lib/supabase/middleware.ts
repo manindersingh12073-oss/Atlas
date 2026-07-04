@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/lib/env";
+import { DEMO_COOKIE } from "@/lib/demo/session";
 
 /**
  * Refreshes the Supabase auth session on every matched request.
@@ -45,15 +46,23 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isPublic =
-    pathname === "/" || pathname === "/login" || pathname.startsWith("/auth");
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/demo");
 
-  // Unauthenticated user on a protected route → login.
-  if (!user && !isPublic) {
+  // A Demo Mode visitor has no Supabase session at all — the atlas_demo
+  // cookie (set by GET /demo, cleared by GET /demo/exit) stands in for one so
+  // they can browse the normal protected routes read-only.
+  const isDemo = request.cookies.get(DEMO_COOKIE)?.value === "1";
+
+  // Unauthenticated user on a protected route → login (unless in Demo Mode).
+  if (!user && !isPublic && !isDemo) {
     return redirectPreservingSession(request, supabaseResponse, "/login");
   }
 
-  // Authenticated user on the login page → dashboard.
-  if (user && pathname === "/login") {
+  // Authenticated user on the login or root page → dashboard.
+  if (user && (pathname === "/login" || pathname === "/")) {
     return redirectPreservingSession(request, supabaseResponse, "/dashboard");
   }
 

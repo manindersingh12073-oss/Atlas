@@ -23,6 +23,16 @@ import { removeTagFromPerson } from "@/lib/tags/actions";
 import { buildTimeline } from "@/lib/people/timeline";
 import { getPersonTags, getTagsWithCounts } from "@/lib/tags/queries";
 import { getRecentPeople } from "@/lib/capture/queries";
+import { isDemoMode } from "@/lib/demo/session";
+import {
+  getPersonEventLinksDemo,
+  getPersonFollowUpsWithUpdatedAtDemo,
+  getPersonRecordDemo,
+  getPersonRelationshipsDemo,
+  getPersonTagsDemo,
+  getRecentPeopleDemo,
+  getTagsWithCountsDemo,
+} from "@/lib/demo/queries";
 import { createClient } from "@/lib/supabase/server";
 
 // Parses YYYY-MM-DD as a local date for display — avoids UTC day-shift.
@@ -71,43 +81,63 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function PersonDetailPage({ params }: Props) {
   const { id } = await params;
-  const supabase = await createClient();
+  const isDemo = await isDemoMode();
 
-  const [personResult, eventLinksResult, followUpsResult, personTags, allTagsWithCounts, relationships, recentPeople] =
-    await Promise.all([
-      supabase
-        .from("people")
-        .select(
-          "id, name, company, role, linkedin_url, email, phone, notes, created_at, updated_at",
-        )
-        .eq("id", id)
-        .single(),
-      supabase
-        .from("event_people")
-        .select("encounter_note, created_at, events(id, name, event_date, location)")
-        .eq("person_id", id),
-      supabase
-        .from("follow_ups")
-        .select("id, person_id, due_date, note, status, completed_at, created_at, updated_at")
-        .eq("person_id", id)
-        .order("due_date", { ascending: true }),
-      getPersonTags(supabase, id),
-      getTagsWithCounts(supabase),
-      getPersonRelationships(supabase, id),
-      getRecentPeople(supabase),
-    ]);
+  const { person, eventLinksRaw, allFollowUps, personTags, allTagsWithCounts, relationships, recentPeople } = isDemo
+    ? {
+        person: getPersonRecordDemo(id),
+        eventLinksRaw: getPersonEventLinksDemo(id) as EventLink[],
+        allFollowUps: getPersonFollowUpsWithUpdatedAtDemo(id) as (FollowUp & { updated_at: string })[],
+        personTags: getPersonTagsDemo(id),
+        allTagsWithCounts: getTagsWithCountsDemo(),
+        relationships: getPersonRelationshipsDemo(id),
+        recentPeople: getRecentPeopleDemo(),
+      }
+    : await (async () => {
+        const supabase = await createClient();
+        const [personResult, eventLinksResult, followUpsResult, personTags, allTagsWithCounts, relationships, recentPeople] =
+          await Promise.all([
+            supabase
+              .from("people")
+              .select(
+                "id, name, company, role, linkedin_url, email, phone, notes, created_at, updated_at",
+              )
+              .eq("id", id)
+              .single(),
+            supabase
+              .from("event_people")
+              .select("encounter_note, created_at, events(id, name, event_date, location)")
+              .eq("person_id", id),
+            supabase
+              .from("follow_ups")
+              .select("id, person_id, due_date, note, status, completed_at, created_at, updated_at")
+              .eq("person_id", id)
+              .order("due_date", { ascending: true }),
+            getPersonTags(supabase, id),
+            getTagsWithCounts(supabase),
+            getPersonRelationships(supabase, id),
+            getRecentPeople(supabase),
+          ]);
+        return {
+          person: personResult.data,
+          eventLinksRaw: (eventLinksResult.data ?? []) as EventLink[],
+          allFollowUps: (followUpsResult.data ?? []) as (FollowUp & { updated_at: string })[],
+          personTags,
+          allTagsWithCounts,
+          relationships,
+          recentPeople,
+        };
+      })();
 
-  if (!personResult.data) notFound();
+  if (!person) notFound();
 
-  const person = personResult.data;
   const deletePersonWithId = deletePerson.bind(null, person.id);
 
-  const allFollowUps = (followUpsResult.data ?? []) as (FollowUp & { updated_at: string })[];
   const today = new Date().toISOString().split("T")[0];
   const activeFollowUps = allFollowUps.filter((f) => f.status !== "done");
   const doneFollowUps = allFollowUps.filter((f) => f.status === "done");
 
-  const eventLinks = ((eventLinksResult.data ?? []) as EventLink[]).sort(
+  const eventLinks = [...eventLinksRaw].sort(
     (a, b) => {
       const dateA = a.events?.event_date ?? null;
       const dateB = b.events?.event_date ?? null;

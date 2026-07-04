@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 
 import { Spinner } from "@/components/ui/Spinner";
+import { useDemoGuard } from "@/lib/demo/context";
 
 export function UncompleteFollowUpButton({
   uncompleteAction,
@@ -10,11 +11,12 @@ export function UncompleteFollowUpButton({
   uncompleteAction: () => Promise<void>;
 }) {
   const [pending, startTransition] = useTransition();
+  const guard = useDemoGuard();
 
   return (
     <button
       type="button"
-      onClick={() => startTransition(() => uncompleteAction())}
+      onClick={() => guard(() => startTransition(() => uncompleteAction()))}
       disabled={pending}
       className="text-xs text-gray-400 hover:underline disabled:opacity-50"
     >

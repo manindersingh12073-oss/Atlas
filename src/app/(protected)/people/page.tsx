@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ProgressiveList } from "@/components/ui/ProgressiveList";
 
 import { UniversalSearchBar } from "@/components/search/UniversalSearchBar";
 import { getSearchSuggestions } from "@/lib/search/queries";
@@ -18,6 +19,14 @@ import {
   parsePeopleSort,
   searchPeople,
 } from "@/lib/people/queries";
+import { isDemoMode } from "@/lib/demo/session";
+import {
+  getPersonEventDataDemo,
+  getPersonTagsMapDemo,
+  getSearchSuggestionsDemo,
+  getTagsWithCountsDemo,
+  searchPeopleDemo,
+} from "@/lib/demo/queries";
 import { createClient } from "@/lib/supabase/server";
 
 type Props = {
@@ -33,16 +42,26 @@ export default async function PeoplePage({ searchParams }: Props) {
     ? tagsParam.split(",").filter(Boolean)
     : [];
 
-  const supabase = await createClient();
+  const isDemo = await isDemoMode();
 
-  const [people, eventDataMap, allTagsWithCounts, personTagsMap, suggestions] =
-    await Promise.all([
-      searchPeople(supabase, query, sort),
-      getPersonEventData(supabase),
-      getTagsWithCounts(supabase),
-      getPersonTagsMap(supabase),
-      getSearchSuggestions(supabase),
-    ]);
+  const [people, eventDataMap, allTagsWithCounts, personTagsMap, suggestions] = isDemo
+    ? [
+        searchPeopleDemo(query, sort),
+        getPersonEventDataDemo(),
+        getTagsWithCountsDemo(),
+        getPersonTagsMapDemo(),
+        getSearchSuggestionsDemo(),
+      ]
+    : await (async () => {
+        const supabase = await createClient();
+        return Promise.all([
+          searchPeople(supabase, query, sort),
+          getPersonEventData(supabase),
+          getTagsWithCounts(supabase),
+          getPersonTagsMap(supabase),
+          getSearchSuggestions(supabase),
+        ]);
+      })();
 
   // "Most events" sort applied in JS after joining counts.
   let displayPeople =
@@ -119,34 +138,26 @@ export default async function PeoplePage({ searchParams }: Props) {
           />
         )}
 
-        {/* Active filter summary */}
-        {(hasQuery || hasTagFilter) && (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              {displayPeople.length}{" "}
-              {displayPeople.length === 1 ? "result" : "results"}
-              {hasQuery && (
-                <>
-                  {" "}for{" "}
-                  <span className="font-medium">&ldquo;{query}&rdquo;</span>
-                </>
-              )}
-            </p>
-            {hasQuery && (
-              <Link
-                href={clearSearchHref}
-                className="text-xs text-gray-500 hover:underline"
-              >
-                Clear search
-              </Link>
-            )}
+        {/* Clear-search link (item count is shown by the list below) */}
+        {hasQuery && (
+          <div className="flex justify-end">
+            <Link
+              href={clearSearchHref}
+              className="text-xs text-gray-500 hover:underline"
+            >
+              Clear search
+            </Link>
           </div>
         )}
       </div>
 
       {displayPeople.length > 0 ? (
-        <ul className="divide-y divide-gray-100 rounded border border-gray-200">
-          {displayPeople.map((person) => {
+        <ProgressiveList
+          storageKey="atlas:pagesize:people"
+          label="people"
+          showAll={hasQuery}
+          listClassName="divide-y divide-gray-100 rounded border border-gray-200"
+          items={displayPeople.map((person) => {
             const ed = eventDataMap.get(person.id);
             const personTags = personTagsMap.get(person.id) ?? [];
             return (
@@ -208,7 +219,7 @@ export default async function PeoplePage({ searchParams }: Props) {
               </li>
             );
           })}
-        </ul>
+        />
       ) : hasQuery || hasTagFilter ? (
         <div>
           <EmptyState

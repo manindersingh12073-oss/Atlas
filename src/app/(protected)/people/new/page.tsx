@@ -1,7 +1,9 @@
 import Link from "next/link";
 
+import { DemoBlockedPage } from "@/components/demo/DemoBlockedPage";
 import { PersonForm } from "@/components/people/PersonForm";
 import { createPerson } from "@/lib/people/actions";
+import { isDemoMode } from "@/lib/demo/session";
 import { getCompanySuggestions } from "@/lib/people/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,6 +13,9 @@ type Props = {
 
 export default async function NewPersonPage({ searchParams }: Props) {
   const { name: prefillName } = await searchParams;
+
+  if (await isDemoMode()) return <DemoBlockedPage backHref="/people" backLabel="People" />;
+
   const supabase = await createClient();
   const companies = await getCompanySuggestions(supabase);
 

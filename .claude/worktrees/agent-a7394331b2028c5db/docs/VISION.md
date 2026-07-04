@@ -1,0 +1,1 @@
+Atlas is a personal relationship operating system that minimizes friction between meeting someone and remembering them forever.

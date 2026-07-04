@@ -20,6 +20,7 @@ import {
 } from "@/lib/graph/layout";
 import { DetailsPanel } from "./DetailsPanel";
 import { GraphCanvas } from "./GraphCanvas";
+import { GraphHelpPanel } from "./GraphHelpPanel";
 import type { AtlasFlowNode } from "./nodes";
 
 // Interaction + orchestration layer: owns filter / selection / search / tooltip
@@ -266,6 +267,9 @@ export function NetworkGraph({ data }: { data: NetworkGraphData }) {
   return (
     <section className="mb-10">
       <h2 className="mb-4 text-xl font-semibold">Network Graph</h2>
+
+      {/* ── How-to (collapsible, first-visit) ────────────────────────── */}
+      <GraphHelpPanel />
 
       {/* ── Graph statistics ─────────────────────────────────────────── */}
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DemoBlockedPage } from "@/components/demo/DemoBlockedPage";
 import { PersonForm } from "@/components/people/PersonForm";
 import { createPersonAndLink } from "@/lib/event-people/actions";
 import type { ActionState } from "@/lib/event-people/actions";
+import { isDemoMode } from "@/lib/demo/session";
 import { getCompanySuggestions } from "@/lib/people/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,6 +13,9 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function AddPersonToEventPage({ params }: Props) {
   const { id } = await params;
+
+  if (await isDemoMode()) return <DemoBlockedPage backHref={`/events/${id}`} backLabel="Event" />;
+
   const supabase = await createClient();
 
   const [eventResult, companies] = await Promise.all([

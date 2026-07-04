@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DemoBlockedPage } from "@/components/demo/DemoBlockedPage";
 import { EventForm } from "@/components/events/EventForm";
 import { createEventAndLink } from "@/lib/event-people/actions";
 import type { ActionState } from "@/lib/event-people/actions";
+import { isDemoMode } from "@/lib/demo/session";
 import { createClient } from "@/lib/supabase/server";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function AddEventToPersonPage({ params }: Props) {
   const { id } = await params;
+
+  if (await isDemoMode()) return <DemoBlockedPage backHref={`/people/${id}`} backLabel="Person" />;
+
   const supabase = await createClient();
 
   const { data: person } = await supabase

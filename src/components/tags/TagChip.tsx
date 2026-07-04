@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 
 import type { Tag } from "@/lib/tags/queries";
+import { useDemoGuard } from "@/lib/demo/context";
 
 // Full class strings required so Tailwind's scanner includes them at build time.
 const STYLES: Record<string, { chip: string; text: string }> = {
@@ -28,6 +29,7 @@ export function TagChip({
   onRemove?: () => Promise<void>;
 }) {
   const [removing, startTransition] = useTransition();
+  const guard = useDemoGuard();
   const style = getStyle(tag.color);
 
   return (
@@ -38,7 +40,7 @@ export function TagChip({
       {onRemove && (
         <button
           type="button"
-          onClick={() => startTransition(() => onRemove())}
+          onClick={() => guard(() => startTransition(() => onRemove()))}
           disabled={removing}
           className="ml-0.5 leading-none opacity-50 hover:opacity-100 disabled:cursor-not-allowed"
           aria-label={`Remove ${tag.name}`}

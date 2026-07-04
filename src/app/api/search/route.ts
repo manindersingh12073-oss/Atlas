@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { searchNetwork } from "@/lib/search/queries";
+import { isDemoMode } from "@/lib/demo/session";
+import { searchNetworkDemo } from "@/lib/demo/queries";
 
 /**
  * Grouped universal search for the dashboard search dropdown.
@@ -11,6 +13,12 @@ import { searchNetwork } from "@/lib/search/queries";
  * Empty query returns empty groups (suggestions are handled client-side).
  */
 export async function GET(request: Request) {
+  const q = new URL(request.url).searchParams.get("q") ?? "";
+
+  if (await isDemoMode()) {
+    return NextResponse.json(searchNetworkDemo(q));
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -20,7 +28,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const q = new URL(request.url).searchParams.get("q") ?? "";
   const results = await searchNetwork(supabase, q);
 
   return NextResponse.json(results);

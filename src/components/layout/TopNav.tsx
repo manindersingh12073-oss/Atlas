@@ -50,7 +50,7 @@ const NAV_LINKS = [
 
 // ── TopNav ─────────────────────────────────────────────────────────────────
 
-export function TopNav({ userEmail }: { userEmail: string }) {
+export function TopNav({ userEmail, isDemo = false }: { userEmail: string; isDemo?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   function closeMobile() {
@@ -102,14 +102,23 @@ export function TopNav({ userEmail }: { userEmail: string }) {
             {userEmail}
           </span>
 
-          <form action={signOut}>
-            <button
-              type="submit"
+          {isDemo ? (
+            <Link
+              href="/demo/exit?next=/login"
               className="rounded px-2 py-1 text-sm text-gray-400 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 dark:text-[#656d76] dark:hover:text-[#8b949e]"
             >
-              Sign out
-            </button>
-          </form>
+              Exit demo
+            </Link>
+          ) : (
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="rounded px-2 py-1 text-sm text-gray-400 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 dark:text-[#656d76] dark:hover:text-[#8b949e]"
+              >
+                Sign out
+              </button>
+            </form>
+          )}
         </div>
 
         {/* ── Mobile hamburger ──────────────────────────────────────── */}
@@ -152,14 +161,23 @@ export function TopNav({ userEmail }: { userEmail: string }) {
             <p className="mb-2 text-xs text-gray-400 dark:text-[#656d76]">
               {userEmail}
             </p>
-            <form action={signOut}>
-              <button
-                type="submit"
+            {isDemo ? (
+              <Link
+                href="/demo/exit?next=/login"
                 className="text-sm text-gray-500 hover:underline dark:text-[#8b949e]"
               >
-                Sign out
-              </button>
-            </form>
+                Exit demo
+              </Link>
+            ) : (
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="text-sm text-gray-500 hover:underline dark:text-[#8b949e]"
+                >
+                  Sign out
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { addRelationship } from "@/lib/relationships/actions";
 import { RELATIONSHIP_OPTIONS } from "@/lib/relationships/queries";
 import type { RelationshipType } from "@/lib/relationships/queries";
+import { useDemoGuard } from "@/lib/demo/context";
 
 type Person = { id: string; name: string; company: string | null };
 
@@ -26,6 +27,7 @@ export function RelationshipPicker({ personId, recentPeople, redirectTo }: Props
   const [pending, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const guard = useDemoGuard();
 
   const filteredRecent = recentPeople.filter(
     (p) =>
@@ -94,7 +96,7 @@ export function RelationshipPicker({ personId, recentPeople, redirectTo }: Props
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => guard(() => setOpen(true))}
         className="text-sm text-gray-500 hover:underline"
       >
         + Add relationship

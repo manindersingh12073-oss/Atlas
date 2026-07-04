@@ -1,6 +1,8 @@
 import { getDashboardData } from "@/lib/dashboard/queries";
 import { getNetworkGraphData } from "@/lib/graph/queries";
 import { NetworkGraphSection } from "@/components/graph/NetworkGraphSection";
+import { isDemoMode } from "@/lib/demo/session";
+import { getDashboardDataDemo, getNetworkGraphDataDemo } from "@/lib/demo/queries";
 import { createClient } from "@/lib/supabase/server";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -17,11 +19,16 @@ function InsightCard({ label, value }: { label: string; value: number }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function InsightsPage() {
-  const supabase = await createClient();
-  const [{ insights }, graph] = await Promise.all([
-    getDashboardData(supabase),
-    getNetworkGraphData(supabase),
-  ]);
+  const { insights, graph } = (await isDemoMode())
+    ? { insights: getDashboardDataDemo().insights, graph: getNetworkGraphDataDemo() }
+    : await (async () => {
+        const supabase = await createClient();
+        const [{ insights }, graph] = await Promise.all([
+          getDashboardData(supabase),
+          getNetworkGraphData(supabase),
+        ]);
+        return { insights, graph };
+      })();
 
   return (
     <main className="mx-auto max-w-[62rem] p-6">

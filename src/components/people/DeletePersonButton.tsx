@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 
 import { Spinner } from "@/components/ui/Spinner";
+import { useDemoGuard } from "@/lib/demo/context";
 
 export function DeletePersonButton({
   deleteAction,
@@ -10,10 +11,13 @@ export function DeletePersonButton({
   deleteAction: () => Promise<void>;
 }) {
   const [pending, startTransition] = useTransition();
+  const guard = useDemoGuard();
 
   function handleClick() {
-    if (!confirm("Delete this person? This cannot be undone.")) return;
-    startTransition(() => deleteAction());
+    guard(() => {
+      if (!confirm("Delete this person? This cannot be undone.")) return;
+      startTransition(() => deleteAction());
+    });
   }
 
   return (

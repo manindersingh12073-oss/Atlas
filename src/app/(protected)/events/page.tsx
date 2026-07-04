@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ProgressiveList } from "@/components/ui/ProgressiveList";
 
 import { SearchInput } from "@/components/SearchInput";
 import { SortSelect } from "@/components/SortSelect";
@@ -11,6 +12,8 @@ import {
   parseEventSort,
   searchEvents,
 } from "@/lib/events/queries";
+import { isDemoMode } from "@/lib/demo/session";
+import { searchEventsDemo } from "@/lib/demo/queries";
 import { createClient } from "@/lib/supabase/server";
 
 function formatEventDate(dateStr: string): string {
@@ -32,8 +35,9 @@ export default async function EventsPage({ searchParams }: Props) {
   const sort = parseEventSort(sortParam);
   const hasQuery = query.length > 0;
 
-  const supabase = await createClient();
-  const events = await searchEvents(supabase, query, sort);
+  const events = (await isDemoMode())
+    ? searchEventsDemo(query, sort)
+    : await searchEvents(await createClient(), query, sort);
 
   return (
     <main className="mx-auto max-w-[62rem] p-6">
@@ -79,12 +83,7 @@ export default async function EventsPage({ searchParams }: Props) {
           </Suspense>
         </div>
         {hasQuery && (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              {events.length}{" "}
-              {events.length === 1 ? "result" : "results"} for{" "}
-              <span className="font-medium">&ldquo;{query}&rdquo;</span>
-            </p>
+          <div className="flex justify-end">
             <Link href="/events" className="text-xs text-gray-500 hover:underline">
               Clear search
             </Link>
@@ -93,8 +92,12 @@ export default async function EventsPage({ searchParams }: Props) {
       </div>
 
       {events.length > 0 ? (
-        <ul className="divide-y divide-gray-100 rounded border border-gray-200">
-          {events.map((event) => (
+        <ProgressiveList
+          storageKey="atlas:pagesize:events"
+          label="events"
+          showAll={hasQuery}
+          listClassName="divide-y divide-gray-100 rounded border border-gray-200"
+          items={events.map((event) => (
             <li key={event.id}>
               <Link
                 href={`/events/${event.id}`}
@@ -125,7 +128,7 @@ export default async function EventsPage({ searchParams }: Props) {
               </Link>
             </li>
           ))}
-        </ul>
+        />
       ) : hasQuery ? (
         <div>
           <EmptyState

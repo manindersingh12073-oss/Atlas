@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import type { RestoreSummary } from "@/lib/restore/validator";
+import { dispatchDemoBlocked, useDemoMode } from "@/lib/demo/context";
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ export function RestoreSection() {
   const [stage, setStage] = useState<Stage>({ type: "idle" });
   const [confirmText, setConfirmText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isDemo = useDemoMode();
 
   const canRestore =
     stage.type === "preview" && confirmText === CONFIRMATION_WORD;
@@ -44,6 +46,11 @@ export function RestoreSection() {
 
     // Reset the file input so the same file can be re-selected after an error.
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    if (isDemo) {
+      dispatchDemoBlocked();
+      return;
+    }
 
     setStage({ type: "validating" });
     setConfirmText("");
