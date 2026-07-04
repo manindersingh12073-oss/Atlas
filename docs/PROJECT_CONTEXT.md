@@ -16,28 +16,43 @@ Core proposition: *You leave a conference. You open Atlas. You remember everyone
 
 ## Landing Page (`/`)
 
-A full marketing homepage for unauthenticated visitors. Authenticated users are redirected to `/dashboard` by both the middleware and the page itself.
+A full marketing homepage for unauthenticated visitors, positioning Atlas as **"the networking memory assistant"** (not a CRM). Authenticated users are redirected to `/dashboard` by both the middleware and the page itself.
 
-**Sections:**
-1. **Sticky header** — Logo, Features, How it works, Pricing (Coming Soon), Feedback, Sign in
-2. **Hero** — "Never forget the people you meet." + product mockup (HTML/CSS browser window) + **"Start free with Google" / "Try Demo"** CTA pair
-3. **Problem** — "Networking is easy. Remembering isn't." — 3 cards (Meet / Capture / Reconnect)
-4. **Workflow** (`#workflow`) — Conference → Open Atlas → Capture → Atlas organises → Reconnect
-5. **Features** (`#features`) — 8 feature cards
-6. **Comparison** — Without Atlas vs With Atlas
-7. **Audience** — Built for (persona chips)
-8. **Testimonials** — 3 placeholder quotes (marked in code comments for replacement before launch)
-9. **FAQ** — 6 questions using `<details>/<summary>` (no JS required)
-10. **Final CTA** — "Start remembering every conversation." + Google sign-in / Try Demo pair
-11. **Footer** — Privacy, Terms, Feedback, Version
+`src/app/page.tsx` is now a thin composition root: it does the auth-redirect check and renders section components from `src/components/landing/` in order. All copy lives in typed `src/content/*.ts` files — editing a section's content should never require touching JSX.
+
+**Sections (in render order):**
+1. **`Nav`** — sticky header: Product, How it works, Use cases, Pricing (Coming Soon), Feedback, Sign in
+2. **`Hero`** — "Never forget the people you meet." + CTA pair + the real Person Profile screenshot (`ScreenshotFrame`)
+3. **`ProblemSection`** — "Networking is easy. Remembering isn't." — 3 cards (Meet / Forget / Reconnect), doubling as the page's story arc
+4. **`ProductTour`** (`#product`) — 5 alternating-row sections, each a real screenshot (Dashboard, Capture, Network Graph, Insights, Search) + an outcome headline. This plus the Hero's Person Profile shot cover all 6 real screenshots the page uses.
+5. **`WorkflowSection`** (`#how-it-works`) — Attend → Open Atlas → Capture → Atlas organises → Reconnect, from `src/content/workflow.ts`
+6. **`UseCasesSection`** (`#use-cases`) — 4 illustrative scenario cards (Startup Demo Day, VC Networking Event, Medical Conference, Research Symposium) from `src/content/useCases.ts`
+7. **`FeaturesSection`** — 6 secondary-capability cards (relationships, follow-ups, tags, export, mobile, duplicate detection) from `src/content/features.ts` — deliberately doesn't repeat the Product Tour's screens
+8. **`ComparisonSection`** — Without Atlas vs With Atlas, from `src/content/comparison.ts`
+9. **`AudienceSection`** — persona chips, from `src/content/audience.ts`
+10. **`FounderStorySection`** — "Why Atlas exists," from `src/content/founderStory.ts`
+11. **`TestimonialsSection`** — 3 placeholder quotes from `src/content/testimonials.ts` (marked for replacement before launch)
+12. **`DemoSpotlight`** — dedicated Demo Mode callout with live counts (people/events/relationships) read from `src/lib/demo/dataset.ts` via `CountUpStat`, plus a prominent Try Demo button
+13. **`FaqSection`** — 6 questions from `src/content/faqs.ts`, using `<details>/<summary>` (no JS required)
+14. **`FinalCta`** — "Start remembering every conversation." + CTA pair
+15. **`Footer`** — Privacy, Terms, Feedback, Version
+
+**Content files** (`src/content/`): `testimonials.ts`, `faqs.ts`, `features.ts`, `useCases.ts`, `founderStory.ts`, `workflow.ts`, `comparison.ts`, `audience.ts`, `screenshots.ts` — each typed, each with a header comment on how to add an entry.
+
+**Real screenshots — `src/components/landing/ScreenshotFrame.tsx`:** a Server Component that resolves `public/marketing/<filename>` via `node:fs`. If the file exists, it renders inside a minimal browser-chrome frame via `next/image`; if not, it renders a same-sized dashed placeholder ("Screenshot coming soon") so `next dev`/`next build` never fail on a missing file. `src/content/screenshots.ts` is the single source of truth for filenames/alt text/which page to capture. Required files: `dashboard.png`, `capture.png`, `person-profile.png`, `network-graph.png`, `insights.png`, `search.png` — capture via Demo Mode at ~1440px, drop into `public/marketing/`, no code changes needed.
+
+**Motion** — two dependency-free Client Components in `src/components/landing/`:
+- `ScrollReveal` — `IntersectionObserver`-driven fade + lift-in, triggers once, respects `motion-reduce:`
+- `CountUpStat` — same trigger, `requestAnimationFrame` easing count-up, jumps straight to the final value under `prefers-reduced-motion`
+
+**Shared CTA — `src/components/landing/SignInButton.tsx`:** exports `SignInButton` (Google OAuth form), and `CtaButtonGroup` (the Start free / Try Demo pair), reused identically by the Hero, `DemoSpotlight`, and `FinalCta`.
 
 **Implementation notes:**
 - All sign-in buttons use `<form action={signInWithGoogle}>` — no intermediate `/login` step for CTAs
 - **"Try Demo"** (`<Link href="/demo">`) is a plain navigation to the Demo Mode entry route — see "Demo Mode" below
-- Product mockup is pure HTML/CSS (no images, no screenshots) — a browser-window-style illustration of the Atlas person profile page
 - `scroll-behavior: smooth` on the root div for anchor navigation
 - `src/lib/supabase/middleware.ts` redirects authenticated users on both `/` and `/login` to `/dashboard`
-- Testimonials are marked `/* PLACEHOLDER — replace before launch */` in the source
+- Color palette is intentionally unchanged from the rest of the app (gray neutrals + a single blue accent for CTAs; no purple/violet anywhere on the page)
 
 ---
 
