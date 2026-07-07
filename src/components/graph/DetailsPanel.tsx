@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
+import { MeetingBriefButton } from "@/components/assistant/MeetingBriefButton";
 import type { GraphNode } from "@/lib/graph/queries";
 import type { NodeDetail } from "@/lib/graph/detail";
 import { NODE_COLORS } from "@/lib/graph/layout";
@@ -242,8 +244,15 @@ export function DetailsPanel({
               </Field>
             </div>
           )}
-          <div className="sm:col-span-2">
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
             <OpenButton href={`/people/${data.id}`}>Open full profile →</OpenButton>
+            <MeetingBriefButton personId={data.id} personName={node.label} />
+            <AskAtlasButton
+              label="Draft Follow-up"
+              templateId="draft-linkedin"
+              personName={node.label}
+              focus={{ personId: data.id }}
+            />
           </div>
         </div>
       )}
@@ -309,8 +318,15 @@ export function DetailsPanel({
               </div>
             </Field>
           </div>
-          <div className="sm:col-span-2">
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
             <OpenButton href={node.navHref}>Search company →</OpenButton>
+            <AskAtlasButton
+              label="Recommend introductions"
+              prompt={`Recommend useful introductions within or from the company "${node.label}": ${derived.people
+                .slice(0, 10)
+                .map((p) => p.label)
+                .join(", ")}.`}
+            />
           </div>
         </div>
       )}
@@ -330,7 +346,16 @@ export function DetailsPanel({
               </div>
             )}
           </Field>
-          <OpenButton href={node.navHref}>Filter people by tag →</OpenButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <OpenButton href={node.navHref}>Filter people by tag →</OpenButton>
+            <AskAtlasButton
+              label="Recommend introductions"
+              prompt={`Recommend useful introductions among people tagged "${node.label}": ${derived.people
+                .slice(0, 10)
+                .map((p) => p.label)
+                .join(", ")}.`}
+            />
+          </div>
         </div>
       )}
     </div>

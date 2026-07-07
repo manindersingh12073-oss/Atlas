@@ -8,6 +8,14 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Base typography ──────────────────────────────────────────────
+   A small nudge for readability — airier line-height for long AI
+   answer text, kept minimal per the app's existing type scale.
+   ──────────────────────────────────────────────────────────────── */
+body {
+  line-height: 1.55;
+}
+
 /* ── Smooth transitions ───────────────────────────────────────────
    Applied broadly so hover states feel responsive without being heavy.
    150 ms matches the duration used throughout the codebase.
@@ -37,9 +45,27 @@ a, button {
 .atlas-tip-in {
   animation: atlas-tip-in 180ms ease-out;
 }
+/* AI "thinking" shimmer — teal-tinted skeleton for Ask Atlas / Meeting Brief
+   loading states. Kept isolated to AI-specific surfaces so it reinforces
+   "AI = teal" rather than being used for every generic skeleton in the app. */
+@keyframes atlas-ai-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.atlas-ai-shimmer {
+  background: linear-gradient(90deg, rgba(20,184,166,0.08) 25%, rgba(20,184,166,0.18) 50%, rgba(20,184,166,0.08) 75%);
+  background-size: 200% 100%;
+  animation: atlas-ai-shimmer 1.6s ease-in-out infinite;
+}
+.dark .atlas-ai-shimmer {
+  background: linear-gradient(90deg, rgba(45,212,191,0.06) 25%, rgba(45,212,191,0.14) 50%, rgba(45,212,191,0.06) 75%);
+  background-size: 200% 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .atlas-dropdown,
-  .atlas-tip-in { animation: none; }
+  .atlas-tip-in,
+  .atlas-ai-shimmer { animation: none; }
 }
 
 /* ── Landing page hero glow ───────────────────────────────────────
@@ -85,7 +111,7 @@ a, button {
   --d-hover:         #1c2230;   /* row hover — slightly brighter than bg */
   --d-text:          #e6edf3;   /* primary text */
   --d-text-sec:      #8b949e;   /* secondary text */
-  --d-text-muted:    #656d76;   /* muted / placeholder text */
+  --d-text-muted:    #767e87;   /* muted / placeholder text — nudged ~7% lighter for readability */
 }
 
 /* ── Body ────────────────────────────────────────────────────────
@@ -150,6 +176,16 @@ a, button {
 .dark .bg-blue-50      { background-color: #0d1f2d; }
 .dark .border-blue-200 { border-color: #1a3a52; }
 .dark .text-blue-600   { color: #58a6ff; }
+
+/* AI accent (teal/cyan) — distinguishes Atlas Copilot / Meeting Brief
+   surfaces from the rest of the app, which stays blue/gray. Same override
+   mechanism as the amber/red/blue/green panels above. */
+.dark .bg-teal-50      { background-color: #0b2420; }
+.dark .bg-teal-100     { background-color: #113631; }
+.dark .border-teal-100 { border-color: #134a41; }
+.dark .border-teal-200 { border-color: #1c5f53; }
+.dark .text-teal-600   { color: #2dd4bf; }
+.dark .text-teal-700   { color: #5eead4; }
 
 /* Green success */
 .dark .text-green-500  { color: #3fb950; }

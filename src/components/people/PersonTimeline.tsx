@@ -1,11 +1,20 @@
 import type { TimelineItem } from "@/lib/people/timeline";
 
-export function PersonTimeline({ items }: { items: TimelineItem[] }) {
+export function PersonTimeline({
+  items,
+  headerAction,
+}: {
+  items: TimelineItem[];
+  headerAction?: React.ReactNode;
+}) {
   if (items.length === 0) return null;
 
   return (
     <section className="mt-6">
-      <h2 className="mb-4 text-base font-semibold">History</h2>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h2 className="text-base font-semibold">History</h2>
+        {headerAction}
+      </div>
       <ol className="space-y-4">
         {items.map((item) => (
           <li key={item.id} className="flex gap-3">

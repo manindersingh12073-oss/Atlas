@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { useEdgesState, useNodesState, type Edge } from "@xyflow/react";
 
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
 import type {
   GraphEdgeKind,
   GraphNodeKind,
@@ -264,6 +265,18 @@ export function NetworkGraph({ data }: { data: NetworkGraphData }) {
   const tooltipNode = tooltip ? nodeMap.get(tooltip.id) : null;
   const selectedNode = selectedId ? nodeMap.get(selectedId) ?? null : null;
 
+  // Client-serialized cluster description for "Explain cluster" / "Find a
+  // connector" — no server tool needed, the graph is already loaded here.
+  const clusterPrompt = useMemo(() => {
+    if (!selectedId || !selectedNode) return null;
+    const neighbourNames = [...(adjacency.get(selectedId) ?? [])]
+      .slice(0, 12)
+      .map((id) => nodeMap.get(id)?.label)
+      .filter((n): n is string => !!n);
+    const names = [selectedNode.label, ...neighbourNames].join(", ");
+    return `Explain this part of my network: ${names}. What connects these, and is there a good connector or introduction opportunity here?`;
+  }, [selectedId, selectedNode, adjacency, nodeMap]);
+
   return (
     <section className="mb-10">
       <h2 className="mb-4 text-xl font-semibold">Network Graph</h2>
@@ -357,6 +370,15 @@ export function NetworkGraph({ data }: { data: NetworkGraphData }) {
             onPaneClick={clearSelection}
             onNodeMouseEnter={onNodeMouseEnter}
             onNodeMouseLeave={onNodeMouseLeave}
+            clusterActionSlot={
+              clusterPrompt ? (
+                <AskAtlasButton
+                  label="Explain cluster"
+                  prompt={clusterPrompt}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-white/95 px-2.5 py-1 text-xs font-medium text-teal-700 shadow-sm hover:bg-teal-50 dark:border-teal-800/50 dark:bg-[#161b22]/95 dark:text-teal-300 dark:hover:bg-teal-500/10"
+                />
+              ) : null
+            }
           />
         )}
       </div>

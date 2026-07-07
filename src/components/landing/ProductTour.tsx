@@ -12,6 +12,20 @@ const rows = [
       "People, events, relationships, and follow-ups — the moment you log in, you know exactly what's next.",
   },
   {
+    screenshot: screenshots.askAtlas,
+    eyebrow: "Ask Atlas",
+    headline: "Ask anything. Atlas already knows.",
+    caption:
+      "Every person, event, and note you've ever added — searchable in plain English, with sources for every answer.",
+  },
+  {
+    screenshot: screenshots.meetingBrief,
+    eyebrow: "Meeting Brief",
+    headline: "Walk into every meeting fully prepared.",
+    caption:
+      "Who they are, how you met, what you discussed, and what to talk about next — generated in seconds.",
+  },
+  {
     screenshot: screenshots.capture,
     eyebrow: "Conference Capture",
     headline: "Capture everyone before you forget.",

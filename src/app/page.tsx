@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { AtlasCopilotSection } from "@/components/landing/AtlasCopilotSection";
 import { AudienceSection } from "@/components/landing/AudienceSection";
 import { ComparisonSection } from "@/components/landing/ComparisonSection";
 import { DemoSpotlight } from "@/components/landing/DemoSpotlight";
@@ -33,6 +34,7 @@ export default async function LandingPage() {
       <Nav />
       <Hero />
       <ProblemSection />
+      <AtlasCopilotSection />
       <ProductTour />
       <WorkflowSection />
       <UseCasesSection />

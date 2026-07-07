@@ -30,6 +30,18 @@ export const screenshots: Record<string, ScreenshotSpec> = {
     alt: "The Atlas dashboard with network stats, search, and recent activity",
     sourcePage: "/dashboard",
   },
+  askAtlas: {
+    id: "askAtlas",
+    filename: "ask-atlas.png",
+    alt: "The Atlas Copilot command palette answering a question with sourced facts and suggested actions",
+    sourcePage: "Any page (Ctrl/Cmd+J)",
+  },
+  meetingBrief: {
+    id: "meetingBrief",
+    filename: "meeting-brief.png",
+    alt: "A full Atlas Meeting Brief — who they are, shared history, and conversation starters",
+    sourcePage: "/people/[id]",
+  },
   capture: {
     id: "capture",
     filename: "capture.png",

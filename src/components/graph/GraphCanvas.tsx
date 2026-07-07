@@ -102,6 +102,7 @@ export function GraphCanvas({
   onPaneClick,
   onNodeMouseEnter,
   onNodeMouseLeave,
+  clusterActionSlot,
 }: {
   nodes: AtlasFlowNode[];
   edges: Edge[];
@@ -112,6 +113,8 @@ export function GraphCanvas({
   onPaneClick: () => void;
   onNodeMouseEnter: (event: React.MouseEvent, node: AtlasFlowNode) => void;
   onNodeMouseLeave: () => void;
+  /** "Explain cluster" / "Find a connector" Ask Atlas action, shown next to Reset/Fit when a node is selected. */
+  clusterActionSlot?: React.ReactNode;
 }) {
   return (
     <ReactFlow
@@ -142,7 +145,10 @@ export function GraphCanvas({
         className="!hidden sm:!block"
       />
       <Panel position="top-right">
-        <ViewportButtons onResetLayout={onResetLayout} />
+        <div className="flex items-center gap-1.5">
+          {clusterActionSlot}
+          <ViewportButtons onResetLayout={onResetLayout} />
+        </div>
       </Panel>
       <Panel position="top-left">
         <Legend />

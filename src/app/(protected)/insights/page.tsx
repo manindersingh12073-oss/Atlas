@@ -1,6 +1,8 @@
 import { getDashboardData } from "@/lib/dashboard/queries";
 import { getNetworkGraphData } from "@/lib/graph/queries";
 import { NetworkGraphSection } from "@/components/graph/NetworkGraphSection";
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
+import { AISection } from "@/components/ui/ai/AISection";
 import { isDemoMode } from "@/lib/demo/session";
 import { getDashboardDataDemo, getNetworkGraphDataDemo } from "@/lib/demo/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -19,7 +21,8 @@ function InsightCard({ label, value }: { label: string; value: number }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function InsightsPage() {
-  const { insights, graph } = (await isDemoMode())
+  const isDemo = await isDemoMode();
+  const { insights, graph } = isDemo
     ? { insights: getDashboardDataDemo().insights, graph: getNetworkGraphDataDemo() }
     : await (async () => {
         const supabase = await createClient();
@@ -33,6 +36,18 @@ export default async function InsightsPage() {
   return (
     <main className="mx-auto max-w-[62rem] p-6">
       <h1 className="mb-6 text-xl font-semibold">Insights</h1>
+
+      <AISection
+        title="Atlas Copilot"
+        description="Ask about your network's shape, bridges, and reconnections."
+        className="mb-8"
+      >
+        <div className="flex flex-wrap gap-2">
+          <AskAtlasButton templateId="explain-graph" label="Explain this graph" variant="outline" />
+          <AskAtlasButton templateId="find-bridge-people" label="Find bridge people" variant="outline" />
+          <AskAtlasButton templateId="who-to-reconnect" label="Recommend reconnections" variant="outline" />
+        </div>
+      </AISection>
 
       {/* ── Network graph (the visual centre of Atlas) ───────────────── */}
       <NetworkGraphSection data={graph} />

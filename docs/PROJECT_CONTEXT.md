@@ -64,6 +64,7 @@ Lets anyone explore the full authenticated app at `/dashboard`, `/people`, `/eve
 - `GET /demo` (`src/app/demo/route.ts`) sets an httpOnly `atlas_demo=1` cookie (30-day expiry) and redirects to `/dashboard`. Linked from the landing page's "Try Demo" CTAs.
 - `GET /demo/exit?next=<path>` (`src/app/demo/exit/route.ts`) clears the cookie and redirects (defaults to `/login`). Used by the "Exit demo" nav link, the demo banner, and the read-only notice's "Create my Atlas" button.
 - `src/lib/supabase/middleware.ts` and `(protected)/layout.tsx` both treat a valid `atlas_demo` cookie as authorization when there is no real Supabase session — a real session always takes precedence. `isDemoMode()` (`src/lib/demo/session.ts`) is the one server-side check every page/route uses.
+- **A real session always overrides the cookie.** `atlas_demo` is a 30-day cookie, so a visitor who tries the demo and *then* creates a real account still carries it. `isDemoMode()` itself checks for a real Supabase user (`getUser()`) and returns `false` whenever one exists, regardless of the cookie — otherwise every page/route below would keep treating that person as a demo visitor and show them the demo dataset instead of their own (empty) account. `src/app/auth/callback/route.ts` also proactively deletes the cookie on a successful sign-in, so a fresh account never depends on that check alone to start blank.
 
 **Data source — the adapter pattern:**
 - `public/demo/atlas-demo.json` is the single source of truth: a file in the exact Atlas backup format (`meta`/`profile`/`people`/`events`/`event_people`/`tags`/`person_tags`/`follow_ups`/`relationships`) that also passes `validateBackup()`. Regenerate it with `python tools/generate_demo_data.py --size demo --seed <n> --output public/demo` (see Development Tooling below) — no code changes required.
@@ -407,7 +408,7 @@ Every table: `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`. Four poli
 - `NEXT_PUBLIC_SITE_URL` — OAuth redirect URL base
 - `SUPABASE_SERVICE_ROLE_KEY` — server-only; bypasses RLS; **not yet used in application code**
 
-Validated in `src/lib/env.ts`; startup fails loudly if missing.
+Validated in `src/lib/env.ts`; startup fails loudly if missing. `src/lib/env.ts` is deliberately scoped to `NEXT_PUBLIC_*` vars only — server-only secrets for other subsystems are read directly from `process.env` where they're used instead (e.g. `OPENAI_API_KEY`/`OPENAI_MODEL` in `src/lib/assistant/config.ts` — see "Ask Atlas" below).
 
 ---
 
@@ -503,6 +504,48 @@ export async function deleteX(id: string): Promise<void>
 
 ---
 
+## Ask Atlas (Atlas Assistant)
+
+A networking **copilot**, not a chatbot — never marketed or labeled as "Atlas AI" anywhere in the product. The product-facing name is **Atlas Assistant**; the UI verb/trigger copy is **"Ask Atlas."** Reachable globally (`Ctrl/Cmd+J`, the TopNav "Ask Atlas" button, a mobile FAB) and as contextual actions throughout the app — person page, relationship rows, timeline, network graph, dashboard — not just from a chat window. Authenticated users only (no Demo Mode access in this pass — no shared-state infra exists yet for rate-limiting an unauthenticated surface).
+
+**Provider**: OpenAI (`openai` npm package, Responses API), model `gpt-5.4` by default (`OPENAI_MODEL` env override). Requires `OPENAI_API_KEY` (server-only); `/api/assistant/chat` returns a clean `503` if unset. An Anthropic implementation (`src/lib/assistant/providers/anthropic.ts`, `claude-sonnet-5` by default via `ANTHROPIC_MODEL`) is kept in the codebase behind the same `AssistantProvider` interface but is not wired into the route — switching providers is a one-line import change in `src/app/api/assistant/chat/route.ts`, which is the entire point of the abstraction.
+
+### The LLM never touches Supabase directly — the Atlas Context Layer
+
+`src/lib/assistant/context/tools.ts` defines 6 read-only tools + a dispatcher, each wrapping existing query functions (no query logic is duplicated):
+- `search_network` → `searchNetwork()` (`src/lib/search/queries.ts`)
+- `get_person_detail` → new `getPersonFull()` (`src/lib/assistant/context/people.ts`) — composes tags/relationships/follow-ups/events and reuses `buildTimeline()` unchanged
+- `get_event_detail` → new `getEventFull()` (`src/lib/assistant/context/events.ts`)
+- `list_reconnection_suggestions` → new `getReconnectionSuggestions()` (`src/lib/assistant/context/insights.ts`) — a **plain, chat-independent function**; a future scheduled job can call it directly for proactive nudges without the LLM
+- `get_network_insights` → `getDashboardData()` + `getNetworkGraphData().stats`
+- `get_user_context` → Atlas Memory (below)
+
+"Explain this cluster" on the Network Graph is deliberately *not* a 7th tool — the graph is already loaded client-side, so the client serializes the selected node + neighbours into the prompt text itself.
+
+### Structured, cited answers — the `respond_to_user` tool
+
+The model's only valid final output is a call to the `respond_to_user` tool (`src/lib/assistant/context/answerSchema.ts`) — never free-streamed prose. Its input schema *is* the `AtlasAnswer` shape: `summary`, top-level `confidence`/`evidenceCount` (the explainability/trust cue), `facts` (each **must** cite ≥1 real Atlas source — event name, "Personal note: …", "Introduced by X", a tag, a follow-up), `suggestions` (each carries a required `rationale` + `confidence`, visually and structurally separate from facts — never blurred together), `actions` (wired to real routes, plus a `save_goal` action a user must click to confirm), and an optional `meetingBrief`. `src/lib/assistant/agent.ts` defensively re-validates this (e.g. downgrades `confidence` if `facts` exist with zero cited evidence) rather than trusting the model's schema adherence alone.
+
+### Provider abstraction & agent loop
+
+`AssistantProvider` (`src/lib/assistant/provider.ts`) is the only seam a provider implementation needs to satisfy — `providers/openai.ts` (active, Responses API) and `providers/anthropic.ts` (kept, unused) both implement it; a Gemini/OpenRouter provider would be a third. `runAgentLoop()` (`src/lib/assistant/agent.ts`) is provider-agnostic: it runs turns until the model calls `respond_to_user` (bounded by `MAX_TOOL_ITERATIONS = 6`), yielding `tool-call-start`/`tool-call-end` events for live "Searching your network…" status chips while gathering, then one `answer` event. `POST /api/assistant/chat` (Node runtime, authenticated-only — same `getUser()` pattern as `/api/search`) streams these as newline-delimited JSON; the client hook `useAskAtlas` (`src/components/assistant/useAskAtlas.ts`) reads the stream via `getReader()`. Conversation memory is session-only, client-held React state — no chat transcripts are persisted.
+
+### Atlas Memory — structured notes, not LLM memory
+
+`atlas_memory` (migration `20260707000001_atlas_memory.sql`) is a small, user-owned table (`category`: `goal` | `preference` | `note`) — the durable context an opaque LLM memory blob would otherwise hold. Every row is visible and editable in Settings → "Networking goals" (`src/components/settings/NetworkingGoalsSection.tsx`). Ask Atlas only ever *reads* this table (the `get_user_context` tool) to bias suggestions and cite goals by name; it never writes to it — a model-proposed goal surfaces as a `save_goal` suggested action that the user must explicitly click, which calls the ordinary `createAtlasMemory`/`saveGoalSuggestion` server actions (`src/lib/atlas-memory/actions.ts`), identical in effect to adding it from Settings.
+
+### Prompt templates & UI
+
+`src/lib/assistant/templates.ts` — built-in templates grouped Meeting / Follow-up / Networking (Prepare me, Conversation starters, Draft LinkedIn message, Who should I reconnect with?, Meeting Brief, etc.). Templates only build a prompt string and call the same `/api/assistant/chat` endpoint as free-form chat — no template has its own backend.
+
+- **`AskAtlasPalette`** — the global `Ctrl/Cmd+J` overlay; its default (empty) view is the template menu, not a blank chat box, so it reads as a command surface. Opens on the shortcut or the `atlas:ask-atlas` window event.
+- **`AskAtlasButton`** — the one shared component for every contextual entry point (relationship rows' "Explain relationship", the timeline's "Summarise history", the graph's "Recommend introductions"/"Explain cluster", the dashboard's "Who should I reconnect with?"). Dispatches `atlas:ask-atlas` with a template/prompt + focus context; `AskAtlasPalette` opens pre-filled and auto-sends.
+- **`AnswerCard`** — renders one `AtlasAnswer` as a card (confidence badge, Facts with source pills, a visually distinct Suggestions block with rationale/confidence, Suggested Actions, Sources) — not a markdown blob.
+- **Meeting Brief** is a flagship, dedicated experience: `MeetingBriefButton` → `MeetingBriefModal` (its own overlay, not routed through the palette) → the richly-sectioned `MeetingBriefCard` (who they are, company/role, where you met, timeline, shared connections, outstanding follow-ups, conversation starters, suggested introductions, suggested goals). Reachable from the person page header, `PersonAskAtlasPanel`, and graph person panels — same backend/template throughout.
+- **`PersonAskAtlasPanel`** — the one entry point that stays inline on the page (per person) rather than opening the overlay: Summarise / Meeting Brief / Draft Follow-up / Suggest conversation topics.
+
+---
+
 ## Current Roadmap Priorities
 
 In order (see ROADMAP.md for full detail):
@@ -513,7 +556,7 @@ In order (see ROADMAP.md for full detail):
 4. **Person-to-person relationships** — record how two people know each other; warm intro paths.
 5. **Network graph** — ✅ shipped: interactive force-directed graph on `/insights` (see "Network Graph").
 6. **Mobile app** — native or PWA with offline-first capture.
-7. **AI features** — follow-up drafting, smart resurfacing, relationship scoring.
+7. **AI features** — ✅ shipped: Ask Atlas / Atlas Assistant (see "Ask Atlas" above). Proactive/unprompted delivery (email/push, calendar/LinkedIn/company-news integrations) remains future work — no scheduler or email provider exists yet.
 
 Items 1 and 2 are highest priority and have pre-built schema support.
 

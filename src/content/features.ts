@@ -16,6 +16,12 @@ export type Feature = {
 
 export const features: Feature[] = [
   {
+    icon: "✦",
+    title: "Ask Atlas anything about your network.",
+    description:
+      "Meeting briefs, follow-up drafts, and reconnection suggestions — grounded in what Atlas actually knows about your relationships. See Atlas Copilot above.",
+  },
+  {
     icon: "🔗",
     title: "Never forget who introduced you.",
     description:

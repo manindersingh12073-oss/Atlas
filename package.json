@@ -12,6 +12,7 @@
     "db:types": "npx supabase gen types typescript --project-id wmzzxqycqvzlwwxufmzp --schema public > src/types/database.types.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
     "@vercel/analytics": "^2.0.1",
@@ -19,6 +20,7 @@
     "@xyflow/react": "^12.11.1",
     "fflate": "^0.8.3",
     "next": "^16.2.9",
+    "openai": "^6.45.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

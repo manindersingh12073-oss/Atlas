@@ -7,6 +7,9 @@ import { usePathname } from "next/navigation";
 
 import { signOut } from "@/lib/auth/actions";
 import { FeedbackButton } from "@/components/ui/FeedbackButton";
+import { AISparkleIcon } from "@/components/ui/ai/AISparkleIcon";
+import { KbdHint } from "@/components/ui/ai/KbdHint";
+import { ASK_ATLAS_EVENT } from "@/components/assistant/events";
 
 // ── Nav link with active-state highlighting ────────────────────────────────
 
@@ -76,6 +79,18 @@ export function TopNav({ userEmail, isDemo = false }: { userEmail: string; isDem
             </NavLink>
           ))}
         </nav>
+
+        {/* ── Atlas Copilot trigger — its own prominent slot, not a minor utility ── */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent(ASK_ATLAS_EVENT))}
+          title="Atlas Copilot (Ctrl/Cmd+J)"
+          className="hidden items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700 hover:border-teal-300 hover:bg-teal-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500 sm:flex dark:border-teal-800/50 dark:bg-teal-500/10 dark:text-teal-300 dark:hover:bg-teal-500/15"
+        >
+          <AISparkleIcon className="h-3.5 w-3.5" />
+          Atlas Copilot
+          <KbdHint />
+        </button>
 
         {/* ── Spacer ────────────────────────────────────────────────── */}
         <div className="flex-1" />
@@ -150,6 +165,17 @@ export function TopNav({ userEmail, isDemo = false }: { userEmail: string; isDem
                 {link.label}
               </NavLink>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent(ASK_ATLAS_EVENT));
+                closeMobile();
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-sm font-semibold text-teal-700 dark:border-teal-800/50 dark:bg-teal-500/10 dark:text-teal-300"
+            >
+              <AISparkleIcon className="h-4 w-4" />
+              Atlas Copilot
+            </button>
             <NavLink href="/settings" onClick={closeMobile}>
               Settings
             </NavLink>

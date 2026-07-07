@@ -1,20 +1,27 @@
+import type { ReactNode } from "react";
+
 import Link from "next/link";
 
 /**
  * Consistent empty state used across all list pages and sections.
  * Shows an icon, title, optional description, and optional primary action.
+ * `secondaryAction` is a free-form slot (e.g. a contextual AskAtlasButton)
+ * rendered after the primary action, without coupling this component to
+ * the assistant module.
  */
 export function EmptyState({
   icon,
   title,
   description,
   action,
+  secondaryAction,
   compact = false,
 }: {
   icon: string;
   title: string;
   description?: string;
   action?: { label: string; href: string };
+  secondaryAction?: ReactNode;
   compact?: boolean;
 }) {
   return (
@@ -41,6 +48,7 @@ export function EmptyState({
           {action.label}
         </Link>
       )}
+      {secondaryAction && <div className="mt-3">{secondaryAction}</div>}
     </div>
   );
 }

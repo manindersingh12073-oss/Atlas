@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
 import { DeleteEventButton } from "@/components/events/DeleteEventButton";
 import { RemovePersonButton } from "@/components/event-people/RemovePersonButton";
 import { deleteEvent } from "@/lib/events/actions";
@@ -137,6 +138,14 @@ export default async function EventDetailPage({ params }: Props) {
             </span>
           </h2>
           <div className="flex shrink-0 gap-2">
+            {peopleCount > 0 && (
+              <AskAtlasButton
+                templateId="summarise-attendees"
+                eventName={event.name}
+                attendeeNames={linkedPeople.map((l) => l.people?.name).filter((n): n is string => !!n)}
+                label="Summarise attendees"
+              />
+            )}
             <Link
               href={`/events/${event.id}/link-person`}
               className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"

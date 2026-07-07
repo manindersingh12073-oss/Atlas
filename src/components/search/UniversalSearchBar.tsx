@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
+import { KbdHint } from "@/components/ui/ai/KbdHint";
 import type { SearchSuggestions } from "@/lib/search/queries";
 import {
   companyItem,
@@ -19,17 +21,32 @@ import { SearchResultsList } from "./SearchResultsList";
 import { useListNav } from "./useListNav";
 import { useNetworkSearch } from "./useNetworkSearch";
 
+const COPILOT_PLACEHOLDERS = [
+  "Ask Atlas anything, or search your network…",
+  "Try: Who should I reconnect with?",
+  "Try: Find everyone I met from DeepMind",
+  "Try: Draft a follow-up for Sarah",
+];
+
 /**
- * The primary inline search bar, used on both the dashboard and the People
- * page. Wraps the shared universal-search hooks in a prominent input with a
+ * The primary inline search bar, used on the dashboard and the People page.
+ * Wraps the shared universal-search hooks in a prominent input with a
  * grouped results dropdown, empty-state suggestions, and keyboard navigation.
+ *
+ * `variant="copilot"` (dashboard Atlas Copilot card only) merges the search
+ * bar with the Copilot's "ask" affordance: a larger input, rotating example
+ * placeholders, and an "Ask Atlas" row appended to the results dropdown —
+ * one entry point for both literal search and handing the same text to the
+ * copilot, instead of two separate inputs.
  */
 export function UniversalSearchBar({
   suggestions,
   autoFocus = false,
+  variant = "default",
 }: {
   suggestions: SearchSuggestions;
   autoFocus?: boolean;
+  variant?: "default" | "copilot";
 }) {
   const router = useRouter();
   const {
@@ -45,6 +62,17 @@ export function UniversalSearchBar({
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Copilot variant: rotating example placeholder, paused while open ─────
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  useEffect(() => {
+    if (variant !== "copilot" || open) return;
+    const id = setInterval(
+      () => setPlaceholderIndex((i) => (i + 1) % COPILOT_PLACEHOLDERS.length),
+      3500,
+    );
+    return () => clearInterval(id);
+  }, [variant, open]);
 
   // ── Build grouped sections ────────────────────────────────────────────────
   const sections = useMemo<Section[]>(() => {
@@ -139,6 +167,7 @@ export function UniversalSearchBar({
   }
 
   const showDropdown = open && (sections.length > 0 || loading || hasQuery);
+  const isCopilot = variant === "copilot";
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -153,11 +182,20 @@ export function UniversalSearchBar({
         onChange={handleChange}
         onFocus={handleFocus}
         onKeyDown={handleKeyDown}
-        placeholder="Search people, companies, events, tags..."
+        placeholder={isCopilot ? COPILOT_PLACEHOLDERS[placeholderIndex] : "Search people, companies, events, tags..."}
         autoComplete="off"
         data-shortcut-search
-        className="block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base shadow-sm transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:outline-none dark:bg-[#161b22]"
+        className={
+          isCopilot
+            ? "block w-full rounded-xl border border-teal-200 bg-white px-4 py-4 pr-16 text-lg shadow-sm transition-colors placeholder:text-gray-400 focus:border-teal-400 focus:outline-none dark:border-teal-800/50 dark:bg-[#161b22]"
+            : "block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base shadow-sm transition-colors placeholder:text-gray-400 focus:border-gray-500 focus:outline-none dark:bg-[#161b22]"
+        }
       />
+      {isCopilot && (
+        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
+          <KbdHint />
+        </div>
+      )}
 
       {showDropdown && (
         <div
@@ -175,6 +213,16 @@ export function UniversalSearchBar({
               hasQuery ? `No matches for “${trimmed}”.` : null
             }
           />
+          {isCopilot && hasQuery && (
+            <div className="border-t border-gray-100 p-2 dark:border-[#30363d]">
+              <AskAtlasButton
+                prompt={trimmed}
+                label={`Ask Atlas: "${trimmed}"`}
+                variant="outline"
+                className="flex w-full items-center justify-start gap-1.5 rounded-md border border-teal-200 bg-teal-50/60 px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-100 dark:border-teal-800/50 dark:bg-teal-500/10 dark:text-teal-300 dark:hover:bg-teal-500/15"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

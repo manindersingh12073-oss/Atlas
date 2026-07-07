@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
+import { MeetingBriefButton } from "@/components/assistant/MeetingBriefButton";
+import { PersonAskAtlasPanel } from "@/components/assistant/PersonAskAtlasPanel";
 import { CompleteFollowUpButton } from "@/components/follow-ups/CompleteFollowUpButton";
 import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButton";
 import { RescheduleFollowUpButtons } from "@/components/follow-ups/RescheduleFollowUpButtons";
@@ -193,6 +196,7 @@ export default async function PersonDetailPage({ params }: Props) {
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
+          <MeetingBriefButton personId={person.id} personName={person.name} size="md" />
           <Link
             href={`/people/${person.id}/edit`}
             className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
@@ -324,7 +328,16 @@ export default async function PersonDetailPage({ params }: Props) {
         </div>
 
         {allFollowUps.length === 0 ? (
-          <p className="mt-3 text-sm text-gray-500">No follow-ups yet.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-gray-500">No follow-ups yet.</p>
+            <AskAtlasButton
+              templateId="dont-forget"
+              personName={person.name}
+              focus={{ personId: person.id }}
+              label="Anything I'm forgetting?"
+              variant="chip"
+            />
+          </div>
         ) : (
           <ul className="mt-3 divide-y divide-gray-100 rounded border border-gray-200">
             {activeFollowUps.map((f) => {
@@ -406,10 +419,21 @@ export default async function PersonDetailPage({ params }: Props) {
       <section className="mt-6">
         <h2 className="mb-3 text-base font-semibold">Relationships</h2>
         {relationships.length === 0 && (
-          <p className="mb-3 text-xs text-gray-400">
-            No relationships recorded. Use the picker below to connect{" "}
-            <span className="font-medium">{person.name}</span> to others in your network.
-          </p>
+          <div className="mb-3">
+            <p className="text-xs text-gray-400">
+              No relationships recorded. Use the picker below to connect{" "}
+              <span className="font-medium">{person.name}</span> to others in your network.
+            </p>
+            <div className="mt-2">
+              <AskAtlasButton
+                templateId="find-introduction"
+                personName={person.name}
+                focus={{ personId: person.id }}
+                label="Find introductions"
+                variant="chip"
+              />
+            </div>
+          </div>
         )}
         {relationships.length > 0 && (
           <ul className="mb-3 divide-y divide-gray-100 rounded border border-gray-200">
@@ -440,7 +464,16 @@ export default async function PersonDetailPage({ params }: Props) {
                       </Link>
                     )}
                   </div>
-                  <RemoveRelationshipButton removeAction={removeAction} />
+                  <div className="flex shrink-0 items-center gap-2">
+                    {other && (
+                      <AskAtlasButton
+                        label="Explain"
+                        prompt={`Explain my relationship with ${other.name}, including how we're connected and what Atlas knows about them.`}
+                        focus={{ personId: person.id }}
+                      />
+                    )}
+                    <RemoveRelationshipButton removeAction={removeAction} />
+                  </div>
                 </li>
               );
             })}
@@ -453,7 +486,20 @@ export default async function PersonDetailPage({ params }: Props) {
         />
       </section>
 
-      <PersonTimeline items={timeline} />
+      <PersonAskAtlasPanel personId={person.id} personName={person.name} />
+
+      <PersonTimeline
+        items={timeline}
+        headerAction={
+          <AskAtlasButton
+            label="Summarise history"
+            templateId="summarise-history"
+            personName={person.name}
+            focus={{ personId: person.id }}
+            variant="ghost"
+          />
+        }
+      />
     </main>
   );
 }

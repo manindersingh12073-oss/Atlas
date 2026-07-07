@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { DEMO_COOKIE } from "@/lib/demo/session";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -27,7 +28,13 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const response = NextResponse.redirect(`${origin}${next}`);
+      // A visitor who tried the demo before signing up still carries the
+      // 30-day atlas_demo cookie. isDemoMode() already gives a real session
+      // precedence over it, but clearing it here too means a fresh account
+      // never depends on that check to start blank.
+      response.cookies.delete(DEMO_COOKIE);
+      return response;
     }
   }
 

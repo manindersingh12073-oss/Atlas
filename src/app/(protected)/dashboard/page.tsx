@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
+import { AtlasCopilotSection } from "@/components/dashboard/AtlasCopilotSection";
 import { CompleteFollowUpButton } from "@/components/follow-ups/CompleteFollowUpButton";
 import { CompletedFollowUpsSection } from "@/components/follow-ups/CompletedFollowUpsSection";
 import { DeleteFollowUpButton } from "@/components/follow-ups/DeleteFollowUpButton";
@@ -8,6 +10,7 @@ import { CurrentConferenceCard } from "@/components/dashboard/CurrentConferenceC
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { CommandPaletteTip } from "@/components/dashboard/CommandPaletteTip";
 import { ProgressiveList } from "@/components/ui/ProgressiveList";
+import { getReconnectionSuggestions } from "@/lib/assistant/context/insights";
 import {
   completeFollowUp,
   deleteFollowUp,
@@ -22,8 +25,9 @@ import type { FollowUpWithPerson } from "@/lib/follow-ups/queries";
 import { getCurrentConference } from "@/lib/capture/queries";
 import { getDashboardData } from "@/lib/dashboard/queries";
 import { getSearchSuggestions } from "@/lib/search/queries";
-import { UniversalSearchBar } from "@/components/search/UniversalSearchBar";
 import { isDemoMode } from "@/lib/demo/session";
+import { getReconnectionSuggestionsDemo } from "@/lib/demo/assistant-context";
+import { demoDataset } from "@/lib/demo/dataset";
 import {
   getCurrentConferenceDemo,
   getDashboardDataDemo,
@@ -132,27 +136,61 @@ function FollowUpCard({ f, groupColor }: { f: FollowUpWithPerson; groupColor?: s
 export default async function DashboardPage() {
   const isDemo = await isDemoMode();
 
-  const { stats, insights, recentPeople, overdue, dueToday, upcoming, done, conference, suggestions } =
-    isDemo
-      ? {
-          ...getDashboardDataDemo(),
-          ...getDashboardFollowUpsDemo(),
-          done: getDoneFollowUpsDemo(1000),
-          conference: getCurrentConferenceDemo(),
-          suggestions: getSearchSuggestionsDemo(),
-        }
-      : await (async () => {
-          const supabase = await createClient();
-          const [{ stats, insights, recentPeople }, { overdue, dueToday, upcoming }, done, conference, suggestions] =
-            await Promise.all([
-              getDashboardData(supabase),
-              getDashboardFollowUps(supabase),
-              getDoneFollowUps(supabase, 1000),
-              getCurrentConference(supabase),
-              getSearchSuggestions(supabase),
-            ]);
-          return { stats, insights, recentPeople, overdue, dueToday, upcoming, done, conference, suggestions };
-        })();
+  const {
+    stats,
+    insights,
+    recentPeople,
+    overdue,
+    dueToday,
+    upcoming,
+    done,
+    conference,
+    suggestions,
+    reconnectionSuggestions,
+    firstName,
+  } = isDemo
+    ? {
+        ...getDashboardDataDemo(),
+        ...getDashboardFollowUpsDemo(),
+        done: getDoneFollowUpsDemo(1000),
+        conference: getCurrentConferenceDemo(),
+        suggestions: getSearchSuggestionsDemo(),
+        reconnectionSuggestions: getReconnectionSuggestionsDemo(3),
+        firstName: demoDataset.profile?.full_name?.split(" ")[0] ?? null,
+      }
+    : await (async () => {
+        const supabase = await createClient();
+        const [
+          { stats, insights, recentPeople },
+          { overdue, dueToday, upcoming },
+          done,
+          conference,
+          suggestions,
+          reconnectionSuggestions,
+          profileResult,
+        ] = await Promise.all([
+          getDashboardData(supabase),
+          getDashboardFollowUps(supabase),
+          getDoneFollowUps(supabase, 1000),
+          getCurrentConference(supabase),
+          getSearchSuggestions(supabase),
+          getReconnectionSuggestions(supabase, 3),
+          supabase.from("profiles").select("full_name").maybeSingle(),
+        ]);
+        return {
+          stats,
+          insights,
+          recentPeople,
+          overdue,
+          dueToday,
+          upcoming,
+          done,
+          conference,
+          suggestions,
+          reconnectionSuggestions,
+          firstName: profileResult.data?.full_name?.split(" ")[0] ?? null,
+        };
+      })();
 
   const hasActive = overdue.length + dueToday.length + upcoming.length > 0;
 
@@ -189,11 +227,15 @@ export default async function DashboardPage() {
             href="#follow-ups"
           />
         </div>
+      </section>
 
-        {/* ── Global network search ──────────────────────────────────── */}
-        <div className="mt-4">
-          <UniversalSearchBar suggestions={suggestions} />
-        </div>
+      {/* ── Atlas Copilot — the dashboard's visual centrepiece ───────── */}
+      <section className="mb-8">
+        <AtlasCopilotSection
+          firstName={firstName}
+          searchSuggestions={suggestions}
+          reconnectionSuggestions={reconnectionSuggestions}
+        />
       </section>
 
       {/* ── Onboarding checklist (first-time users) ─────────────────── */}
@@ -252,14 +294,23 @@ export default async function DashboardPage() {
         <h2 className="mb-3 text-base font-semibold">Follow-ups</h2>
 
         {!hasActive && (
-          <p className="text-sm text-gray-500">
-            No overdue or upcoming follow-ups.{" "}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-gray-500">
+              No overdue or upcoming follow-ups.{" "}
+              {stats.peopleCount > 0 && (
+                <Link href="/people" className="underline">
+                  Open a contact to add one.
+                </Link>
+              )}
+            </p>
             {stats.peopleCount > 0 && (
-              <Link href="/people" className="underline">
-                Open a contact to add one.
-              </Link>
+              <AskAtlasButton
+                templateId="who-to-reconnect"
+                label="Who should I reconnect with?"
+                variant="chip"
+              />
             )}
-          </p>
+          </div>
         )}
 
         {overdue.length > 0 && (

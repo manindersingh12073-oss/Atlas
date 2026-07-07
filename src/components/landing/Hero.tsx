@@ -11,8 +11,8 @@ export function Hero() {
 
       <div className="relative mx-auto max-w-6xl px-6">
         <ScrollReveal>
-          <div className="mb-6 inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-500 dark:border-[#30363d] dark:bg-[#161b22] dark:text-[#8b949e]">
-            The networking memory assistant
+          <div className="mb-6 inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs text-teal-700 dark:border-teal-800/50 dark:bg-teal-500/10 dark:text-teal-300">
+            The AI memory assistant for professional networking
           </div>
         </ScrollReveal>
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { AskAtlasButton } from "@/components/assistant/AskAtlasButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProgressiveList } from "@/components/ui/ProgressiveList";
 
@@ -234,6 +235,15 @@ export default async function PeoplePage({ searchParams }: Props) {
               hasQuery
                 ? { label: `Add "${query}"`, href: `/people/new?name=${encodeURIComponent(query)}` }
                 : undefined
+            }
+            secondaryAction={
+              hasQuery ? (
+                <AskAtlasButton
+                  prompt={`Find people related to "${query}" in my network.`}
+                  label={`Ask Atlas about "${query}"`}
+                  variant="chip"
+                />
+              ) : undefined
             }
           />
           {hasQuery && (

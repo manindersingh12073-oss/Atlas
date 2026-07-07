@@ -1,15 +1,19 @@
 import Link from "next/link";
 
 import { ExportButtons } from "@/components/export/ExportButtons";
+import { NetworkingGoalsSection } from "@/components/settings/NetworkingGoalsSection";
 import { RestoreSection } from "@/components/settings/RestoreSection";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import { FeedbackButton } from "@/components/ui/FeedbackButton";
 import { ReplayTourButton } from "@/components/demo/ReplayTourButton";
+import { getAtlasGoals } from "@/lib/atlas-memory/queries";
 import { isDemoMode } from "@/lib/demo/session";
 import { ATLAS_VERSION } from "@/lib/export/formatters";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function SettingsPage() {
   const isDemo = await isDemoMode();
+  const goals = isDemo ? [] : await getAtlasGoals(await createClient());
 
   return (
     <main className="mx-auto max-w-[62rem] p-6 pb-24">
@@ -44,6 +48,18 @@ export default async function SettingsPage() {
           </div>
         )}
       </section>
+
+      {/* ════════════════════════════════════════════════════════════
+          ASK ATLAS
+      ════════════════════════════════════════════════════════════ */}
+      {!isDemo && (
+        <section className="mb-12">
+          <h2 className="mb-6 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+            Ask Atlas
+          </h2>
+          <NetworkingGoalsSection goals={goals} />
+        </section>
+      )}
 
       {/* ════════════════════════════════════════════════════════════
           DATA
