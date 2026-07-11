@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { ExportButtons } from "@/components/export/ExportButtons";
+import { HelpFaq } from "@/components/settings/HelpFaq";
+import { HowToUseAtlas } from "@/components/settings/HowToUseAtlas";
 import { NetworkingGoalsSection } from "@/components/settings/NetworkingGoalsSection";
 import { RestoreSection } from "@/components/settings/RestoreSection";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
@@ -88,6 +90,34 @@ export default async function SettingsPage() {
           </p>
           <RestoreSection />
         </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════
+          HOW TO USE ATLAS
+      ════════════════════════════════════════════════════════════ */}
+      <section className="mb-12">
+        <h2 className="mb-6 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+          How to use Atlas
+        </h2>
+        <p className="mb-4 text-sm leading-relaxed text-gray-500">
+          A quick guide to every part of Atlas. Tap any feature to see what it
+          does and how to use it.
+        </p>
+        <HowToUseAtlas />
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════
+          FAQ
+      ════════════════════════════════════════════════════════════ */}
+      <section className="mb-12">
+        <h2 className="mb-6 border-b border-gray-200 pb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">
+          FAQ
+        </h2>
+        <p className="mb-4 text-sm leading-relaxed text-gray-500">
+          Common &ldquo;how do I…&rdquo; questions about getting things done in
+          Atlas.
+        </p>
+        <HelpFaq />
       </section>
 
       {/* ════════════════════════════════════════════════════════════

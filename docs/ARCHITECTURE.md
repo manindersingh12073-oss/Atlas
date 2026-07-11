@@ -33,29 +33,48 @@ src/
 - `login/page.tsx` — Google sign-in button; bounces authed users to `/dashboard`
 
 ### `(protected)` — authenticated
-- `layout.tsx` — **authoritative auth guard**; calls `getUser()` server-side; redirects to `/login` if no session
+- `layout.tsx` — **authoritative auth guard**; calls `getUser()` server-side, or a valid `atlas_demo` cookie (Demo Mode); redirects to `/login` if neither; mounts `CommandPalette`, `DemoModeModal`
 - All app pages live here; full route tree:
 
 ```
 /dashboard
+/insights                                    # network graph + analytics
+/settings                                    # appearance, Ask Atlas goals, data export/restore, about
+/capture                                     # conference/quick-capture mode
 /people
 /people/new
 /people/[id]
 /people/[id]/edit
-/people/[id]/link-event        # select an existing event to link
-/people/[id]/add-event         # create a new event and link atomically
+/people/[id]/link-event                      # select an existing event to link
+/people/[id]/add-event                       # create a new event and link atomically
+/people/[id]/follow-ups/new
+/people/[id]/follow-ups/[followUpId]/edit
 /events
 /events/new
 /events/[id]
 /events/[id]/edit
-/events/[id]/link-person       # select an existing person to link
-/events/[id]/add-person        # create a new person and link atomically
-/events/[id]/people/[personId]/edit-note   # edit encounter note for a specific link
+/events/[id]/capture                         # capture mode pre-scoped to this event
+/events/[id]/link-person                     # select an existing person to link
+/events/[id]/add-person                      # create a new person and link atomically
+/events/[id]/people/[personId]/edit-note     # edit encounter note for a specific link
 ```
 
+Routes that are entirely about writing (all `new`/`edit`/`link-*`/`add-*`/capture routes above) render `<DemoBlockedPage>` instead of the real form when `isDemoMode()` is true.
+
 ### `auth/` — OAuth plumbing
-- `callback/route.ts` — exchanges `?code=` for a session; redirects to `/dashboard`
+- `callback/route.ts` — exchanges `?code=` for a session; redirects to `/dashboard`; also clears any stale `atlas_demo` cookie on successful sign-in
 - `auth-code-error/page.tsx` — fallback for failed exchanges
+
+### `demo/` — Demo Mode entry/exit
+- `route.ts` — sets the `atlas_demo` cookie (30-day expiry) and redirects to `/dashboard`
+- `exit/route.ts` — clears the cookie and redirects (`?next=` or `/login`)
+
+### `api/` — Route Handlers
+- `assistant/chat` — Ask Atlas streaming endpoint (Node runtime, authenticated or demo)
+- `search`, `search/suggestions` — Universal Search backend
+- `graph/node` — lazy node-detail fetch for the Network Graph
+- `export/json`, `export/zip` — full-account data export
+- `restore/validate`, `restore/execute` — backup validation and destructive restore
 
 ---
 
@@ -121,31 +140,30 @@ Application code always sets `owner_id` server-side from `getUser()`. It is neve
 | `tags` | `uuid` | `name`, `color` | Unique on `(owner_id, lower(name))` |
 | `person_tags` | `(person_id, tag_id)` | `owner_id` | Junction; owner_id denormalized |
 | `follow_ups` | `uuid` | `person_id`, `due_date`, `note`, `status`, `completed_at` | Status: `pending` / `done` / `snoozed` |
+| `person_relationships` | `uuid` | `person_a`, `person_b`, `type`, `owner_id` | Type enum: `met_together` / `introduced_by` / `works_with` / `co_founder` / `friend`; unique dedup index on the pair |
+| `atlas_memory` | `uuid` | `category`, `content`, `owner_id` | Category: `goal` / `preference` / `note`; backs Ask Atlas's user-editable networking goals (Settings) |
 
 **Key indexes:** GIN on `people.search_vector`; GIN trigram on `people.name`; `(owner_id, event_date DESC NULLS LAST)` on events; `(owner_id, status, due_date)` on follow_ups.
 
-**Postgres RPCs** (migration 006):
+**Migrations** (`supabase/migrations/`, 8 files):
+`20260615000001_extensions.sql` · `20260615000002_profiles.sql` · `20260615000003_people_events_tags.sql` · `20260615000004_junctions_follow_ups.sql` · `20260615000005_indexes.sql` · `20260616000001_rpc_create_and_link.sql` · `20260621000002_person_relationships.sql` · `20260707000001_atlas_memory.sql`
+
+**Postgres RPCs** (migration `20260616000001`):
 - `create_person_and_link(p_event_id, p_name, ...)` — atomically inserts a person and an `event_people` row
 - `create_event_and_link(p_person_id, p_name, ...)` — atomically inserts an event and an `event_people` row
 - Both use `SECURITY INVOKER`; RLS applies normally inside
+
+**Known gap:** `person_relationships` was added after the last `npm run db:types` run, so it isn't in the generated `Database` type. `src/lib/relationships/actions.ts` and `src/lib/capture/actions.ts` cast `supabase as any` for inserts against this table as a documented workaround — re-running `db:types` removes the need for the cast.
 
 ---
 
 ## Search Architecture
 
-### People (`/people?q=`)
+Atlas has one search engine (`searchNetwork()` in `src/lib/search/queries.ts`) powering the dashboard bar, People page, and Command Palette, plus a People-specific ranked search. Full detail — the 6-query ranked People search, the `searchNetwork()`/Command Palette/`UniversalSearchBar` layering, recent-viewed people, and Events search — lives in **`PROJECT_CONTEXT.md` → "Search Functionality"**; this section only summarises to avoid duplicated, driftable detail.
 
-Three parallel Supabase queries, merged and deduplicated by `id` in JS, sorted alphabetically:
+### People (`/people?q=`) — `searchPeople()` in `src/lib/people/queries.ts`
 
-1. `.textSearch("search_vector", q, { type: "websearch", config: "english" })` — full-text across name, company, role, notes (GIN index)
-2. `.ilike("name", "%q%")` — partial/fuzzy name matching (GIN trigram index)
-3. `.ilike("company", "%q%")` — partial company matching (seq scan; fast at Atlas scale)
-
-Empty query returns all people with the current sort applied.
-
-Query strings are pre-escaped (`%` → `\%`, `_` → `\_`) before being used in ILIKE patterns.
-
-Implemented in `src/lib/people/queries.ts → searchPeople()`.
+Empty query returns all people with the current sort applied. Query strings are pre-escaped (`%` → `\%`, `_` → `\_`) before being used in ILIKE patterns. Round 1 (parallel): FTS on `search_vector`, `ilike` name, `ilike` company, tag-name match (`person_tags` join), event-name match (`event_people` join). Round 2 (conditional): `person_relationships` lookup when Round 1 name matches exist. Results are ranked by strongest signal matched, then merged/deduped by `id`.
 
 ### Events (`/events?q=`)
 
@@ -227,6 +245,16 @@ Real-time, advisory, non-blocking. Lives entirely in `PersonForm` (Client Compon
 - **`SortSelect`** — generic; requires Suspense; uses `usePathname` + `useSearchParams`
 - **`SearchInput`** — generic; no Suspense needed; requires `pathname` + `defaultSort` props
 
+### Tags, follow-ups, relationships (person page)
+- **`TagPicker`** / **`TagChip`** / **`TagFilterBar`** — `src/components/tags/`; actions in `src/lib/tags/actions.ts`, queries in `src/lib/tags/queries.ts`
+- **`FollowUpForm`**, **`CompleteFollowUpButton`**, **`UncompleteFollowUpButton`**, **`DeleteFollowUpButton`**, **`RescheduleFollowUpButtons`**, **`CompletedFollowUpsSection`** — `src/components/follow-ups/`; actions in `src/lib/follow-ups/actions.ts`
+- **`RelationshipPicker`**, **`RemoveRelationshipButton`** — `src/components/relationships/`; actions in `src/lib/relationships/actions.ts` (note the `person_relationships` typing gap above)
+- All of the above are read by `buildTimeline()` (`src/lib/people/timeline.ts`) to render the person page's unified activity timeline
+
+### Capture / Conference Mode
+- `CaptureForm` (`src/components/capture/`) + `captureAndSave()`/`linkExistingInCapture()`/`undoCapture()` (`src/lib/capture/actions.ts`) create a person (or link an existing one) and atomically attach tags, an event link, a follow-up, and "met together" relationships in one save — sequential inserts, not a single transaction, intentional for capture-speed over strict atomicity
+- `src/lib/capture/queries.ts` — `getCapturedToday()`, `getRecentPeople()`, `getRecentCompanies()`, `getCurrentConference()` (also feeds the dashboard's "Current Conference" card)
+
 ---
 
 ## Server Action Patterns
@@ -261,9 +289,13 @@ Defined locally in each `actions.ts` file. Not shared across modules.
 - `src/lib/events/actions.ts` — `createEvent`, `updateEvent`, `deleteEvent`
 - `src/lib/event-people/actions.ts` — `linkPerson`, `linkEvent`, `removePersonFromEvent`, `removeEventFromPerson`, `updateEncounterNote`, `createPersonAndLink`, `createEventAndLink`
 - `src/lib/auth/actions.ts` — `signInWithGoogle`, `signOut`
+- `src/lib/tags/actions.ts` — `addTagToPerson`, `removeTagFromPerson`, `createAndAddTag`
+- `src/lib/follow-ups/actions.ts` — `createFollowUp`, `updateFollowUp`, `deleteFollowUp`, `completeFollowUp`, `uncompleteFollowUp`, `snoozeFollowUp`
+- `src/lib/relationships/actions.ts` — `addRelationship`, `removeRelationship`
+- `src/lib/capture/actions.ts` — `captureAndSave`, `linkExistingInCapture`, `undoCapture`
+- `src/lib/atlas-memory/actions.ts` — `createAtlasMemory`, `saveGoalSuggestion` (Ask Atlas networking goals)
 
-
-
+For the Ask Atlas assistant (provider abstraction, agent loop, context tools) and Demo Mode (adapter pattern, read-only enforcement), see `PROJECT_CONTEXT.md` — those subsystems are large enough to warrant their own dedicated sections there rather than duplicating in this file.
 
 ## AI Development Instructions
 

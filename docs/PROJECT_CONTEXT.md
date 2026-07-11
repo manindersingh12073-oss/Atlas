@@ -153,6 +153,9 @@ The visual centre of Atlas. Two parts:
 - **RLS** — row-level security enabled and forced on all tables; every query is owner-scoped
 - **Database types** — auto-generated via `npm run db:types`; fully typed query client
 
+### Also implemented — see their own sections below
+**Tags**, **Follow-ups**, **Person-to-Person Relationships**, **Person Timeline**, **Capture / Conference Mode**, **Settings**, **Backup, Export & Restore**, **Network Graph**, **Ask Atlas (Atlas Assistant)**, and **Demo Mode** are all large enough features to warrant their own dedicated sections further down this document rather than being summarised here.
+
 ---
 
 ## Database Schema
@@ -365,6 +368,88 @@ All in `src/lib/event-people/actions.ts`:
 
 ---
 
+## Tags
+
+Free-form labels for people, filterable from the People list.
+
+- **Components** (`src/components/tags/`): `TagPicker` (add/remove tags on a person, with create-new-tag-inline via `createAndAddTag`), `TagChip` (colored pill, deterministic color hashed from the tag name), `TagFilterBar` (People page — toggles `?tags=` filter params)
+- **Actions** (`src/lib/tags/actions.ts`): `addTagToPerson`, `removeTagFromPerson`, `createAndAddTag`
+- **Queries** (`src/lib/tags/queries.ts`): `getTagsWithCounts`, `getPersonTags`, `getPersonTagsMap`
+- Every write-triggering tag component calls `useDemoGuard()` first (see "Demo Mode" above)
+
+---
+
+## Follow-ups
+
+Per-person reminders with a due date, optional note, and status (`pending` / `done` / `snoozed`).
+
+- **Actions** (`src/lib/follow-ups/actions.ts`): `createFollowUp`, `updateFollowUp`, `deleteFollowUp`, `completeFollowUp`, `uncompleteFollowUp`, `snoozeFollowUp` (preset offsets: `1d` / `7d` / `30d`, computed against local dates to avoid timezone drift)
+- **Queries** (`src/lib/follow-ups/queries.ts`): `getDashboardFollowUps` (grouped overdue / due today / upcoming), `getDoneFollowUps(supabase, limit)`
+- **Pages**: `/people/[id]/follow-ups/new`, `/people/[id]/follow-ups/[followUpId]/edit`
+- **Components** (`src/components/follow-ups/`): `FollowUpForm`, `CompleteFollowUpButton`, `UncompleteFollowUpButton`, `DeleteFollowUpButton`, `RescheduleFollowUpButtons`, `CompletedFollowUpsSection`
+- Rendered in two places with identical actions available: the dashboard's Follow-ups section (all users' overdue/due-today/upcoming/completed, paged via `ProgressiveList`) and each person's own page (that person's follow-ups only)
+
+---
+
+## Person-to-Person Relationships
+
+Records how two people know each other, independent of any shared event.
+
+- **Schema**: `person_relationships` (migration `20260621000002_person_relationships.sql`) — `person_a`, `person_b`, `type` (`met_together` / `introduced_by` / `works_with` / `co_founder` / `friend`), unique dedup index on the pair, `owner_id` denormalized for RLS
+- **Queries** (`src/lib/relationships/queries.ts`): `getPersonRelationships`, `getDisplayLabel` (renders the type + other person's name from either side of the pair, e.g. "Introduced by X" vs "Introduced X")
+- **Actions** (`src/lib/relationships/actions.ts`): `addRelationship`, `removeRelationship`
+- **Components** (`src/components/relationships/`): `RelationshipPicker`, `RemoveRelationshipButton` — both wired into the person page
+- **Known gap**: `person_relationships` was added after the last `npm run db:types` run, so it's absent from the generated `Database` type. Both `relationships/actions.ts` and `capture/actions.ts` cast `supabase as any` for inserts/queries against this table as a documented workaround — re-running `db:types` removes the need for the cast (see ROADMAP.md)
+- Feeds directly into the person page's unified timeline (below) and Capture Mode's "met together" step
+
+---
+
+## Person Timeline
+
+A single, unified activity feed on each person's page, built by a pure function so new entry types never require component changes.
+
+- **`buildTimeline()`** (`src/lib/people/timeline.ts`) takes data the person detail page already fetched (person, event links, follow-ups, relationships) and returns a sorted `TimelineItem[]` — newest first, sorted by an ISO `sortKey` distinct from the display date
+- **Entry types**: `person_created`, `event_attended` (sorted by `event_date` when known, else when the link was recorded), `follow_up_created`, `follow_up_completed`, `follow_up_rescheduled` (emitted for `snoozed` status), `relationship_created`
+- Rendered by `PersonTimeline` (`src/components/people/PersonTimeline.tsx`)
+- Ask Atlas's `get_person_detail` tool reuses `buildTimeline()` unchanged rather than duplicating the aggregation logic (see "Ask Atlas" below)
+
+---
+
+## Capture / Conference Mode
+
+A single-screen, fast-add flow for standing at an event and capturing a person plus all of their context in one save — the embodiment of the Product Principles' "Conference Mode is the fastest workflow in the app."
+
+- **Routes**: `/capture` (general) and `/events/[id]/capture` (pre-scoped to one event)
+- **`CaptureForm`** (`src/components/capture/CaptureForm.tsx`) plus `CaptureTagSelector`, `CaptureCompanyInput`, `PersonPicker` (`src/components/capture/`) — one form covers name/company, tag selection, event link, a follow-up preset, and "met together" relationship picks
+- **Actions** (`src/lib/capture/actions.ts`):
+  - `captureAndSave(input)` — creates the person, then best-effort attaches tags, an event link, a follow-up, and "met together" relationships. Sequential inserts, not one transaction — intentional trade-off for capture-speed over strict atomicity; person creation is the one step that must succeed
+  - `linkExistingInCapture(input)` — same side-effects, but against an existing person (chosen from the duplicate-detection panel) instead of creating a new one
+  - `undoCapture(personId)` — deletes a person captured this session; cascade deletes clean up all associated rows
+- **Queries** (`src/lib/capture/queries.ts`): `getCapturedToday`, `getRecentPeople` (pre-populates the relationship picker), `getRecentCompanies`, `getCurrentConference` (also feeds the dashboard's "Current Conference" card — shown only when someone was captured today)
+- Blocked entirely in Demo Mode (`isDemoMode()` check renders `<DemoBlockedPage>` instead of the form)
+
+---
+
+## Settings (`/settings`)
+
+Four sections, in order:
+1. **Appearance** — `ThemeSelector` (light/dark/system); Demo Mode additionally shows `ReplayTourButton` to reopen the welcome tour
+2. **Ask Atlas** (hidden entirely in Demo Mode) — `NetworkingGoalsSection`, the CRUD UI for `atlas_memory` rows (goals/preferences/notes) — see "Atlas Memory" under "Ask Atlas" below
+3. **Data** — `ExportButtons` (JSON/ZIP export) and `RestoreSection` (validate-then-execute restore from a backup file)
+4. **About** — beta notice, `FeedbackButton`, a workflow diagram, best-practice tips, keyboard shortcuts reference, and the app version (`ATLAS_VERSION` from `src/lib/export/formatters.ts`)
+
+---
+
+## Backup, Export & Restore
+
+Full-account data portability — export everything, and restore from a previous export.
+
+- **Export**: `GET /api/export/json` and `GET /api/export/zip` (the ZIP wraps the same JSON via `fflate`, dependency-free). Data assembled by `fetchAllUserData()` (`src/lib/export/queries.ts`) and shaped by `buildJSON()` (`src/lib/export/formatters.ts`, which also exports `ATLAS_VERSION` shown in Settings → About). `ExportButtons` (`src/components/export/`) triggers both. Works identically in Demo Mode (exports the demo dataset).
+- **Restore**: `POST /api/restore/validate` then `POST /api/restore/execute`. `validateBackup()` (`src/lib/restore/validator.ts`) checks the schema version, UUID shapes, follow-up statuses, relationship types, and referential integrity (no dangling FKs, no duplicate junction rows) before anything is written. Execute strips the generated `search_vector` column, remaps `owner_id` to the current user, and **replaces** the account's existing data — a destructive, confirmed action. UI: `RestoreSection` (`src/components/settings/`), on the Settings → Data section.
+- The exact backup format (`meta`/`profile`/`people`/`events`/`event_people`/`tags`/`person_tags`/`follow_ups`/`relationships`) is also what `tools/generate_demo_data.py` outputs and what `public/demo/atlas-demo.json` conforms to — one format serves real backups, restores, and the Demo Mode dataset.
+
+---
+
 ## Authentication Approach
 
 1. User clicks "Continue with Google" → `signInWithGoogle()` server action → Supabase OAuth → redirect to Google
@@ -546,19 +631,9 @@ The model's only valid final output is a call to the `respond_to_user` tool (`sr
 
 ---
 
-## Current Roadmap Priorities
+## Remaining Roadmap
 
-In order (see ROADMAP.md for full detail):
-
-1. **Follow-ups** — reminders per person with due date, note, and status; overdue view on dashboard. Schema (`follow_ups` table) already exists.
-2. **Tags** — label people with free-form tags; filter people list by tag. Schema (`tags`, `person_tags` tables) already exists.
-3. **Dashboard (full)** — the route exists as a placeholder; needs due follow-ups, recently added people, and recent events.
-4. **Person-to-person relationships** — record how two people know each other; warm intro paths.
-5. **Network graph** — ✅ shipped: interactive force-directed graph on `/insights` (see "Network Graph").
-6. **Mobile app** — native or PWA with offline-first capture.
-7. **AI features** — ✅ shipped: Ask Atlas / Atlas Assistant (see "Ask Atlas" above). Proactive/unprompted delivery (email/push, calendar/LinkedIn/company-news integrations) remains future work — no scheduler or email provider exists yet.
-
-Items 1 and 2 are highest priority and have pre-built schema support.
+Every originally-planned feature (follow-ups, tags, full dashboard, person-to-person relationships, network graph, an AI layer) has shipped — see ROADMAP.md for the up-to-date remaining list: proactive/unprompted Ask Atlas delivery (no scheduler or email/push provider exists), calendar/LinkedIn/company-news integrations, a mobile app (no PWA infra exists yet), re-running `db:types` to drop the `person_relationships` cast, replacing placeholder landing-page testimonials, and capturing real marketing screenshots.
 
 ---
 

@@ -10,9 +10,10 @@ export type ProviderConversation = unknown;
 
 /**
  * The interface a Claude/OpenAI/Gemini/OpenRouter implementation must
- * satisfy. Only `providers/anthropic.ts` exists today; adding another
- * provider means implementing this interface — nothing in agent.ts,
- * the context tools, or the UI needs to change.
+ * satisfy. `providers/openai.ts` is the active implementation;
+ * `providers/anthropic.ts` also exists but is currently unused. Adding
+ * another provider means implementing this interface — nothing in
+ * agent.ts, the context tools, or the UI needs to change.
  */
 export interface AssistantProvider {
   /** Starts a new conversation from a system prompt + prior turns. */

@@ -39,6 +39,12 @@ export const features: Feature[] = [
       "Tag people by context — NHS, VC, AI, founder — anything that matters to you.",
   },
   {
+    icon: "📥",
+    title: "Bring your LinkedIn network with you.",
+    description:
+      "Import your LinkedIn connections from a CSV export in a couple of clicks. Likely duplicates are flagged automatically, and everyone is tagged so you can find them later.",
+  },
+  {
     icon: "📦",
     title: "Your data, always yours.",
     description:

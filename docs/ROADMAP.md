@@ -1,87 +1,64 @@
-# Atlas
+# Atlas — Roadmap
 
-A personal networking CRM for professionals. Atlas helps users capture the people they meet, the events they attend, and the context behind each relationship — and resurfaces that information when it matters.
+A personal networking CRM for professionals. Atlas helps users capture the people they meet, the events they attend, and the context behind each relationship — and resurfaces that information when it matters. See `PROJECT_CONTEXT.md` for full implementation detail on everything below.
 
 ---
 
-# Current State
+# Current State — Shipped
 
-## Implemented Features
+Every item that used to be a roadmap priority (follow-ups, tags, full dashboard, person-to-person relationships, network graph, and an AI layer) has shipped. Atlas is a fully working, single-user product today:
 
 - **Authentication** — Google OAuth via Supabase Auth; protected routes; session handling
-- **Profiles** — auto-created on signup; 1:1 with `auth.users`
-- **People CRUD** — create, read, update, delete; all seven fields; company suggestions via datalist
-- **Events CRUD** — create, read, update, delete; name, date, location, description
-- **Event ↔ Person linking** — via `event_people` junction; encounter notes per link; create-and-link in one action (atomic RPC); link/unlink from both sides
-- **Search (People)** — real-time, URL-driven (`?q=`); FTS on `search_vector` + ILIKE name + ILIKE company; debounced
-- **Search (Events)** — real-time, URL-driven (`?q=`); ILIKE name + location + description; debounced
-- **Sorting (People)** — Name A-Z/Z-A, Recently Added, Oldest Added, Recently Updated, Most Events; URL-driven (`?sort=`)
-- **Sorting (Events)** — Most Recent, Oldest, A-Z, Z-A, Most People, Fewest People, Recently Added; URL-driven (`?sort=`)
-- **Duplicate detection** — real-time name similarity check while creating a person; advisory only; never blocks
-- **Company suggestions** — datalist populated from existing people; case-insensitive dedup; most-frequent casing wins
-- **RLS** — row-level security enabled and forced on all tables; every query is owner-scoped
+- **People & Events CRUD** — full create/read/update/delete, real-time URL-driven search and sorting for both, company suggestions, duplicate detection
+- **Event ↔ Person linking** — junction table with encounter notes, atomic create-and-link RPCs, link/unlink from either side
+- **Follow-ups** — per-person reminders with due date/note/status (pending/done/snoozed), overdue/due-today/upcoming/completed views on both the dashboard and person page, snooze presets
+- **Tags** — free-form labels with `TagPicker`/`TagChip`, filter the people list by tag
+- **Person-to-person relationships** — `person_relationships` table (met together / introduced by / works with / co-founder / friend), `RelationshipPicker` UI, feeds the person timeline and warm-intro-style suggestions
+- **Dashboard** — action-focused home: stats, global search, current conference, network activity, follow-ups
+- **Insights (`/insights`)** — analytics cards + the network graph
+- **Network Graph** — interactive force-directed graph of people/companies/events/tags/relationships, built on React Flow, with community detection, filters, focus mode, and a details panel
+- **Universal Search + Command Palette** — one search engine (people/events/companies/tags/relationships) powering the dashboard bar, People page, and `Cmd/Ctrl+K` palette
+- **Capture / Conference Mode** — `/capture` and `/events/[id]/capture`: fast one-screen flow to add a person plus tags, event link, follow-up, and "met together" relationships in a single save; "Captured today" + undo
+- **Ask Atlas (Atlas Assistant)** — OpenAI-backed networking copilot: global overlay (`Ctrl/Cmd+J`), contextual buttons throughout the app, Meeting Brief, prompt templates, cited structured answers, and an `atlas_memory` table for user-editable networking goals/preferences
+- **Demo Mode** — the entire authenticated app explorable with zero sign-up via a cookie + adapter pattern (no duplicated pages), read-only enforcement, welcome tour
+- **Backup / Export / Restore** — JSON and ZIP export of all user data; a validated restore flow that replaces the account's data
+- **Settings** — Appearance (theme), Ask Atlas (networking goals), Data (export/restore), About
+- **Marketing landing page** — full unauthenticated homepage at `/`, section components under `src/components/landing/`
+- **RLS** — row-level security enabled and forced on every table; every query owner-scoped
 
 ---
 
 # Database Schema
 
-### `profiles`
-One row per user. Linked 1:1 to `auth.users`. Stores display name and avatar. Auto-created on signup via trigger.
-
-### `people`
-Core entity. Fields: `name` (required), `company`, `role`, `linkedin_url`, `email`, `phone`, `notes`. Includes a generated `search_vector` (tsvector) over name, company, role, and notes, with GIN index. GIN trigram index on `name` for fuzzy matching.
-
-### `events`
-Fields: `name` (required), `event_date`, `location`, `description`. Indexed by `(owner_id, event_date DESC NULLS LAST)`.
-
-### `event_people`
-Junction between `people` and `events`. Composite PK `(event_id, person_id)`. Stores `encounter_note` and `owner_id` (denormalized for RLS). Two Postgres RPC functions handle atomic create-and-link: `create_person_and_link` and `create_event_and_link`.
-
-### `tags`
-User-defined labels. Fields: `name`, `color`. Unique constraint on `(owner_id, lower(name))`.
-
-### `person_tags`
-Junction between `people` and `tags`. Composite PK `(person_id, tag_id)`. `owner_id` denormalized for RLS.
-
-### `follow_ups`
-Reminder records linked to a person. Fields: `due_date`, `note`, `status` (`pending` / `done` / `snoozed`), `completed_at`. Indexed by `(owner_id, status, due_date)` to drive the dashboard query.
+See `ARCHITECTURE.md` → "Database Tables" for the authoritative, up-to-date table list (8 migrations: `profiles`, `people`, `events`, `event_people`, `tags`, `person_tags`, `follow_ups`, `person_relationships`, `atlas_memory`, plus the two atomic-link RPCs).
 
 ---
 
 # Design Principles
 
-- **Mobile-first eventually** — current UI is desktop-tolerant; mobile layout is a later priority
-- **Fast capture** — minimise the steps between meeting someone and recording them
-- **Minimise friction** — required fields are kept to a minimum; optional fields are progressively disclosed
-- **Reuse existing patterns before creating new ones** — new features should mirror People/Events CRUD unless there is a specific reason not to
-- **Prefer server components** — data fetching belongs on the server; Client Components are used only where interactivity is required
-- **Avoid unnecessary dependencies** — no new packages without justification; the existing stack (Next.js, Supabase, Tailwind) covers almost every need
-- **Keep architecture simple** — server actions for mutations, server components for data fetching, URL params for state, RLS for security
-- **Use existing CRUD and search patterns** — new entities should follow the People/Events implementation as a reference
+See `PRODUCT_PRINCIPLES.md` for the full list. Summary: minimise taps, optimise for standing/one-handed use, never force navigation when an action can happen in place, remember context over re-asking, relationship management over data management, reuse existing patterns before inventing new ones, avoid unnecessary dependencies.
 
 ---
 
-# Planned Features
+# Remaining Roadmap
 
-In priority order:
+With the core product built, remaining work is smaller and more speculative:
 
-1. **Follow-ups** — reminders per person with due date, note, and status; overdue view on dashboard. Database schema (`follow_ups` table with `pending` / `done` / `snoozed` status) already exists; UI not yet built.
-2. **Tags** — label people with free-form tags; filter people list by tag. Database schema (`tags`, `person_tags` tables) already exists; UI not yet built.
-3. **Dashboard (full)** — the `/dashboard` route exists as a navigation placeholder (user email + links to People and Events); needs due follow-ups, recently added people, and recent events activity to become the intended home screen.
-4. **Person-to-person relationships** — record how two people know each other; warm intro paths
-5. **Network graph** — visual map of people and events
-6. **Mobile app** — native or PWA with offline-first capture
-7. **AI features** — follow-up message drafting; smart resurfacing; relationship scoring
+1. **Proactive AI delivery** — Ask Atlas is pull-only today (user opens it). No scheduler or email/push provider exists yet to *push* reconnection nudges or meeting briefs unprompted.
+2. **Calendar / LinkedIn / company-news integrations** — would feed Ask Atlas's context layer and the reconnection-suggestion tool with external signals; none exist today.
+3. **Mobile app** — native or PWA with offline-first capture. No manifest, service worker, or PWA dependency exists yet; the current UI is responsive but not installable/offline.
+4. **Re-run `db:types` for `person_relationships`** — the table exists and works, but wasn't present when the generated `Database` type was last regenerated, so `src/lib/relationships/actions.ts` casts `supabase as any` as a workaround. Low-risk cleanup, not a feature gap.
+5. **Replace placeholder testimonials** — `src/content/testimonials.ts` on the landing page is explicitly marked for replacement with real quotes before public launch.
+6. **Capture real marketing screenshots** — `public/marketing/` expects `dashboard.png`, `capture.png`, `person-profile.png`, `network-graph.png`, `insights.png`, `search.png`; until captured, the landing page renders dashed placeholders.
 
 ---
 
-# Deferred Features
+# Deferred / Out of Scope
 
 - LinkedIn scraping or enrichment
-- Automatic messaging or outreach
-- Email integration
-- AI-generated contact summaries
-- Advanced analytics and reporting
+- Automatic messaging or outreach on the user's behalf
+- Multi-user / team features (Atlas is intentionally single-user, owner-scoped)
+- Advanced analytics/reporting beyond the existing Insights cards
 
 ---
 

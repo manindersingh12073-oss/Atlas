@@ -15,6 +15,11 @@ export const faqs: Faq[] = [
       "LinkedIn is a public directory, optimised for your professional image. Atlas is a private memory layer, optimised for your relationships — the context, the notes, how you actually met, who introduced you. LinkedIn was never built to hold any of that.",
   },
   {
+    question: "Can I import my existing LinkedIn connections?",
+    answer:
+      "Yes. Export your connections from LinkedIn as a CSV, then upload it in Atlas under People → Import from LinkedIn. Atlas flags anyone who looks like a duplicate before adding a single person, and tags every imported contact “LinkedIn Import” so you can find them later.",
+  },
+  {
     question: "Does Atlas own my contacts?",
     answer:
       "No. Your network is yours. Atlas never sells or shares your data, and you can export everything — every person, event, and relationship — at any time.",
